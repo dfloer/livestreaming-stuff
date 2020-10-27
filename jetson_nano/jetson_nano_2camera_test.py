@@ -12,8 +12,8 @@ if __name__ == "__main__":
 
     interpipe_sink_options = "sync=false async=false forward-events=true forward-eos=true"
 
-    input1_gst = f"v4l2src device=/dev/video0 ! video/x-h264 ! nvv4l2decoder ! nvvidconv ! video/x-raw,format=YUY2 ! timeoverlay text=GC311: ! queue ! interpipesink name=input1 {interpipe_sink_options}"
-    input2_gst = f"v4l2src device=/dev/video1 ! timeoverlay text=Camlink4k: ! queue ! interpipesink name=input2 {interpipe_sink_options}"
+    input2_gst = f"v4l2src device=/dev/video1 ! video/x-h264 ! nvv4l2decoder ! nvvidconv ! video/x-raw,format=YUY2 ! timeoverlay text=GC311: ! queue ! interpipesink name=input1 {interpipe_sink_options}"
+    input1_gst = f"v4l2src device=/dev/video0 ! timeoverlay text=Camlink4k: ! queue ! interpipesink name=input2 {interpipe_sink_options}"
     # input1_gst = "videotestsrc pattern=smpte is-live=true ! video/x-raw,width=1920,height=1080,framerate=30/1 ! timeoverlay text=input1: ! queue ! interpipesink name=input1 sync=false async=false forward-events=true forward-eos=true"
     # input2_gst = "videotestsrc pattern=smpte is-live=true ! video/x-raw,width=1920,height=1080,framerate=30/1 ! videoflip method=horizontal-flip ! timeoverlay text=input2: ! queue ! interpipesink name=input2 sync=false async=false forward-events=true forward-eos=true"
 
