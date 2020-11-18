@@ -1,0 +1,21 @@
+[srt_relay]
+listen_port = 4000  # port for the SRT relay to listen on
+output_port = 9000  # port for the SRT relaythat OBS connects to
+
+[obs]
+websocket_host = "obs-host"  # hostname of the computer running obs/obs-websocket
+websocket_port = 4444  # port to connect to obs-websocket on
+websocket_secret = ""  # secret to use with obs-websocket
+scene_name = "IRL Input"  # name in OBS for the normal scene
+brb_scene_name = "BRB"  # name in obs of the brb scene
+
+[brb_thresholds]
+rtt = 150  # If the RTT goes _above_ this number, go brb
+bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb
+running_avg = 5  # To smooth over small blips, this many check_intervals are used to calculate a running average.
+check_interval = 0.1  # seconds. How often to check the stats
+stabilize_time = 5  # How many seconds do we have to be under the thresholds to go return from brb.
+
+
+# [api]
+# listen = "0.0.0.0:9001"
