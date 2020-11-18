@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Streaming Control</title>
+
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+
+  </head>
+  <body>
+
+    <div class="container-fluid">
+	<div class="row">
+		<div class="col-md-12">
+
+		</div>
+	</div>
+	<div class="row">
+		<div class="col-md-7">
+			<table class="table table-sm" load="update_table()">
+				<thead>
+					<tr>
+						<th>
+							&nbsp;
+						</th>
+						<th>
+							&nbsp;
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="table-success">
+						<td>
+							Current Input:
+						</td>
+						<td id="current_input">
+							<strong>loading input...</strong>
+						</td>
+					</tr>
+					<tr class="table-active">
+						<td>
+							Current Bitrate
+						</td>
+						<td id="current_bitrate">
+							<strong>loading bitrate...</strong>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							SRT Stats:
+						</td>
+						<td id="srt_stats">
+							loading srt stats...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							SRT output server:
+						</td>
+						<td id="srt_output">
+							loading output...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Bitrate Steps:
+						</td>
+						<td id="bitrate_steps">
+							loading bitrate steps...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Audio:
+						</td>
+						<td id="bitrate_steps">
+							loading audio status...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Stream Status:
+						</td>
+						<td id="bitrate_steps">
+							loading stream status...
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="col-md-1">
+		</div>
+		<div class="col-md-4">
+			<button type="button" onclick="button_click(this)" class="btn btn-success btn-lg btn-block" name="switch" id="switch">
+				Switch Input
+			</button>
+			<button type="button"  onclick="button_click(this)" class="btn btn-lg btn-block btn-info" name="go_live" id="go_live">
+				Go Live!
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-lg btn-warning" name="reset_bitrate" id="reset_bitrate">
+				Reset Bitrate
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-danger btn-sm" name="stop" id="stop">
+				Stop
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="refresh" id="refresh">
+				Refresh
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-success btn-md" name="mute" id="mute">
+				Mute Audio
+			</button>
+		</div>
+	</div>
+</div>
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+	<script src="js/scripts.js"></script>
+	<script>
+		var refresh_stats = true;
+		var muted = false;
+		update_table()
+		var update_interval = setInterval(update_table, 1000);
+		function button_click(elem) {
+			console.log(elem.id);
+			if (elem.id == "refresh") {
+				update_table();
+			}
+			if (elem.id == "switch") {
+				switch_input();
+				update_table();
+			}
+			if (elem.id == "go_live") {
+				start_stream();
+				update_table();
+			}
+			if (elem.id == "stop") {
+				stop_stream();
+				update_table();
+			}
+			if (elem.id == "mute") {
+				toggle_audio();
+				update_table();
+				var refresh_button = document.querySelector("#mute");
+				if(muted == false) {
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-success(?!\S)/g , '' );
+					refresh_button.className += " btn-danger";
+					muted = true;
+					refresh_button.innerHTML = "UnMute Audio"
+				}
+				else {
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-danger(?!\S)/g , '' );
+					refresh_button.className += " btn-success";
+					muted = false;
+					refresh_button.innerHTML = "Mute Audio"
+				}
+			}
+			if (elem.id == "refresh") {
+				var refresh_button = document.querySelector("#refresh");
+				if(refresh_stats == true) {
+					refresh_stats = false;
+					clearInterval(update_interval);
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+					refresh_button.className += " btn-secondary";
+				}
+				else {
+					update_interval = setInterval(update_table, 1000);
+					refresh_stats = true;
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+					refresh_button.className += " btn-primary";
+				}
+			}
+		}
+		function update_table() {
+			var base_url = "http://nano:8000";
+			var srt_stats = document.querySelector("#srt_stats");
+			var srt_output = document.querySelector("#srt_output");
+			var bitrate_steps = document.querySelector("#bitrate_steps");
+			var current_bitrate = document.querySelector("#current_bitrate");
+			var current_input = document.querySelector("#current_input");
+
+			fetch(base_url + "/srt-stats").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var stats_str = "bitrate: " + res.stats.bitrate.toFixed(2) + "Mb/s, flight: " + res.stats.flight + ", flow: " + res.stats.flow + ", rtt: " + res.stats.rtt.toFixed(2) + ", dropped: " + res.stats.send_dropped;
+					srt_stats.textContent = stats_str;
+					srt_output.textContent = res.output;
+				});
+			});
+			fetch(base_url + "/outputs").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var bitrate_str = res.current_bitrate / 1000000 + " Mb/s";
+					var steps_str = res.bitrate_steps;
+					current_bitrate.innerHTML = "<strong>" + bitrate_str + "</strong>";
+					var nice_steps = steps_str.map(x => x / 1000000 + "Mb/s");
+					bitrate_steps.textContent = nice_steps.join(", ");
+				});
+			});
+			fetch(base_url + "/inputs").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var input_str = res.nice_name
+					current_input.innerHTML = "<strong>" + input_str + "</strong>";
+				});
+			});
+		}
+
+		async function postData(url = '', data = {}){
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+      				'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(data),
+			});
+			return response;
+		}
+		function switch_input() {
+			var url = "http://nano:8000/inputs/swap"
+			postData(url, {});
+		}
+		function start_stream() {
+			var url = "http://nano:8000/start"
+			postData(url, {});
+		}
+		function stop_stream() {
+			var url = "http://nano:8000/stop"
+			postData(url, {});
+		}
+		function toggle_audio() {
+			var url = "http://nano:8000/audio/toggle"
+			var pd = postData(url, {});
+			console.log(pd)
+		}
+	</script>
+
+  </body>
+</html>
