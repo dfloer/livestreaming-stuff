@@ -1,6 +1,7 @@
 from pygstc.gstc import *
 from dataclasses import dataclass
 from datetime import datetime
+from pygstc.gstcerror import GstdError
 
 @dataclass(init=False)
 class Pipeline(object):
@@ -15,10 +16,24 @@ class Pipeline(object):
         self.nice_name = config["nice_name"]
         self.description = config["full_gst"]
         self.debug = debug
+        self.create_pipeline()
 
-        if self.debug:
-            self.print_debug(f"Pipeline created: {self.name}")
-        self.client.pipeline_create(self.name, self.description)
+    def create_pipeline(self):
+        """
+        This is mostly meant for crash recovery, but if gstd already has the pipeline that we're trying to create, just use the existing one.
+        If there was anything else using gstd, this could be problematic, but there isn't, so this is fine.
+
+        There _may_ be a bug in gstd where if we try to re-create an existing pipeline and get an error, the pipeline gets into a weird state.
+        So instead of a try/except block, explicitly check to see if this pipeline already exists.
+        """
+        existing_pipelines = [x["name"] for x in self.client.list_pipelines()]
+        if self.name not in existing_pipelines:
+            if self.debug:
+                self.print_debug(f"Pipeline created: {self.name}")
+            self.client.pipeline_create(self.name, self.description)
+        else:
+            if self.debug:
+                self.print_debug(f"Existing pipeline re-used: {self.name}")
 
     def play(self):
         if self.debug:
@@ -54,8 +69,14 @@ class Pipeline(object):
     def set_property(self, element, prop, val):
         new_val = str(val)
         if self.debug:
-            self.print_debug(f"{self.name} element {element}: {prop} = {new_val}.")
+            self.print_debug(f"{self.name} element {element}: {prop} set to {new_val}.")
         self.client.element_set(self.name, element, prop, new_val)
+
+    def get_property(self, element, prop):
+        val = self.client.element_get(self.name, element, prop)
+        if self.debug:
+            self.print_debug(f"{self.name} element {element}: {prop} is {val}.")
+        return str(val)
 
     def cleanup(self):
         self.eos()
@@ -88,7 +109,7 @@ class Output(Pipeline):
     def switch_src(self, new_src):
         if self.debug:
             self.print_debug(f"Switching pipeline: {self.name} to source {new_src}")
-        self.client.element_set(self.name, self.name, 'listen-to', new_src)
+        self.set_property(self.name, 'listen-to', new_src)
 
     def set_bitrate(self, val=0):
         if not val:

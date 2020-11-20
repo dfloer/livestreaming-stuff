@@ -7,7 +7,7 @@ class Inputs(object):
         self.input1_pipeline = input1
         self.input2_pipeline = input2
         self.output_pipeline = output_pipeline
-        self.active_input = "input1"
+        self.active_input = self.output_pipeline.get_property(self.output_pipeline.name, 'listen-to')
 
     def as_json(self):
         which = self.active_input
@@ -127,6 +127,7 @@ class StreamControls(object):
     def on_post(self, req, res):
         # post_contents = req.bounded_stream.read()
         if 'start' in req.url:
+            self.pipelines, _ = control.setup(True)
             msg = "Stream started."
         elif 'stop' in req.url:
             control.stop_pipelines(self.pipelines)

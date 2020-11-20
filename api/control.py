@@ -112,7 +112,7 @@ def create_pipelines(client, config, debug=False):
     input1 = gstds.Pipeline(gstdclient=client, name="input1", config=input1_config, debug=debug)
     input2_gst = f"v4l2src device={input2_dev} ! {input2_config['gst']} ! interpipesink name=input2 {interpipe_sink_options}"
     if debug:
-        print("input2 gst:", input1_gst)
+        print("input2 gst:", input2_gst)
     input2_config["full_gst"] = input2_gst
     input2 = gstds.Pipeline(gstdclient=client, name="input2", config=input2_config, debug=debug)
 
