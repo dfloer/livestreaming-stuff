@@ -74,6 +74,7 @@ if __name__ == "__main__":
     try:
         idx = 0
         while True:
+            idx += 1
             current_scene = obs_ctrl.current_scene
             print(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
             stats = srt_thread.last_stats
@@ -82,13 +83,14 @@ if __name__ == "__main__":
 
             rtt_samples[idx % ra_samples] = stats["link"]["rtt"]
             bitrate_samples[idx % ra_samples] = stats["send"]["mbitRate"]
-            rtt_ra = sum([x for x in rtt_samples if x])
-            bitrate_ra = sum([x for x in bitrate_samples if x])
+            rtt_ra = sum([x for x in rtt_samples if x is not None]) / ra_samples
+            bitrate_ra = sum([x for x in bitrate_samples if x is not None]) / ra_samples
 
             healthy = rtt_ra <= thresholds["rtt"] and bitrate_ra >= thresholds["bitrate"]
             if "SRT source disconnected" in srt_thread.last_message:
                 healthy = False
             print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}.")
+            print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}.")
 
             if healthy:
                 if stabilize_countdown >= 0.0:
