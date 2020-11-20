@@ -70,8 +70,25 @@ class Outputs(object):
         res.body = self.as_json()
         res.status = falcon.HTTP_200
 
-    def on_post(self, req, res):
+    def on_post(self, req, res, bitrate=None):
+        """
+        Bitrate could be a numeric value, but "reset", "inc" and "dec" are also supported.
+        """
         post_contents = req.bounded_stream.read()
+
+        bitrate_idx = self.bitrate_steps.index(self.current_bitrate)
+        if bitrate == "reset":
+            self.current_bitrate = self.target_bitrate
+        elif bitrate == "dec":
+            new_idx = max(0, min(bitrate_idx + 1, len(self.bitrate_steps)))
+            self.current_bitrate = self.bitrate_steps[new_idx]
+        elif bitrate == "inc":
+            new_idx = max(0, min(bitrate_idx - 1, len(self.bitrate_steps)))
+            self.current_bitrate = self.bitrate_steps[new_idx]
+        else:
+            # This might get overwritten by the below.
+            res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
+            res.status = falcon.HTTP_400
         try:
             bitrate = int(json.loads(post_contents)["current_bitrate"])
             if bitrate in self.bitrate_steps:
@@ -84,6 +101,7 @@ class Outputs(object):
         except Exception:
             res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
             res.status = falcon.HTTP_400
+        self.output_pipeline.set_bitrate(self.current_bitrate)
 
 class SRT(object):
     def __init__(self, srt):

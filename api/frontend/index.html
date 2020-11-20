@@ -113,6 +113,12 @@
 			<button type="button" onclick="button_click(this)" class="btn btn-success btn-md" name="mute" id="mute">
 				Mute Audio
 			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_up">
+				Bitrate Up
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_down">
+				Bitrate Down
+			</button>
 		</div>
 	</div>
 </div>
@@ -140,6 +146,18 @@
 			}
 			if (elem.id == "stop") {
 				stop_stream();
+				update_table();
+			}
+			if (elem.id == "bitrate_up") {
+				change_bitrate("inc");
+				update_table();
+			}
+			if (elem.id == "bitrate_down") {
+				change_bitrate("dec");
+				update_table();
+			}
+			if (elem.id == "reset_bitrate") {
+				change_bitrate("res");
 				update_table();
 			}
 			if (elem.id == "mute") {
@@ -221,21 +239,34 @@
 			return response;
 		}
 		function switch_input() {
-			var url = "http://nano:8000/inputs/swap"
+			var url = "http://nano:8000/inputs/swap";
 			postData(url, {});
 		}
 		function start_stream() {
-			var url = "http://nano:8000/start"
+			var url = "http://nano:8000/start";
 			postData(url, {});
 		}
 		function stop_stream() {
-			var url = "http://nano:8000/stop"
+			var url = "http://nano:8000/stop";
 			postData(url, {});
 		}
 		function toggle_audio() {
-			var url = "http://nano:8000/audio/toggle"
+			var url = "http://nano:8000/audio/toggle";
 			var pd = postData(url, {});
-			console.log(pd)
+			console.log(pd);
+		}
+		function change_bitrate(dir) {
+			var url = "http://nano:8000/outputs/encoder";
+			if(dir == "inc") {
+				url += "/inc"
+			}
+			else if(dir == "dec") {
+				url += "/dec"
+			}
+			else {
+				url += "/reset"
+			}
+			postData(url, {});
 		}
 	</script>
 

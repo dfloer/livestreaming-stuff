@@ -119,4 +119,4 @@ class Output(Pipeline):
             self.print_debug(f"{self.name} encoder '{self.encoder}' bitrate changed to {new_val}.")
         self.client.element_set(self.name, self.encoder, "bitrate", new_val)
         text_elem_name = [x["name"] for x in self.list_elements() if "textoverlay" in x["name"]][0]
-        self.set_property(text_elem_name, "text", f"bitrate: {self.bitrate / 1000}kb/s")
+        self.set_property(text_elem_name, "text", f"bitrate: {val / 1000}kb/s")
