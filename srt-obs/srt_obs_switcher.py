@@ -4,6 +4,7 @@ from obswebsocket import obsws, requests
 from dataclasses import dataclass
 from time import sleep
 from itertools import chain
+import threading
 
 
 def get_config(config_file="srt_config.toml"):
@@ -49,7 +50,7 @@ class OBSWebsocket(object):
 
     def stop_stream(self):
         print("stopping stream")
-        return self.ws.call(requests.StartStreaming())
+        return self.ws.call(requests.StopStreaming())
 
     def stream_status(self):
         return self.ws.call(requests.GetStreamingStatus())
@@ -62,8 +63,9 @@ class OBSWebsocket(object):
         return f"Scenes: {self.scenes}, normal name: {self.normal_scene}, brb name: {self.brb_scene}."
 
 
-class OBSControl(object):
-    def __init__(self, srt_thread, config_path="srt_config.toml"):
+class OBSControl(threading.Thread):
+    def __init__(self, srt_thread, config_path="srt_config.toml", debug=False):
+        self.event = threading.Event()
         self.config = get_config(config_path)
         self.srt_cfg = self.config["srt_relay"]
         self.srt_thread = srt_thread
@@ -72,8 +74,10 @@ class OBSControl(object):
         self.brb_scene = self.obs_cfg["brb_scene_name"]
         self.stabilize_dec = self.thresholds["check_interval"]
         self.obs_websoc = OBSWebsocket(self.obs_cfg)
+        self.debug = debug
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
+        super().__init__(group=None)
 
     def run(self):
         ra_samples = self.thresholds["running_avg"]
@@ -81,10 +85,11 @@ class OBSControl(object):
         bitrate_samples = [None for _ in range(ra_samples)]
         stabilize_countdown = 0
         idx = 0
-        while True:
+        while not self.event.is_set():
             idx += 1
             current_scene = self.obs_websoc.current_scene
-            print(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
+            if self.debug:
+                print(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
             stats = self.srt_thread.last_stats
             if stats == {}:
                 continue
@@ -97,8 +102,9 @@ class OBSControl(object):
             healthy = rtt_ra <= self.thresholds["rtt"] and bitrate_ra >= self.thresholds["bitrate"]
             if "SRT source disconnected" in self.srt_thread.last_message:
                 healthy = False
-            print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
-            print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}.")
+            if self.debug:
+                print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
+                print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}.")
 
             # If scene has been set manually to BRB, don't switch away from the BRB scene.
             if self.obs_websoc.manual_brb:
@@ -114,7 +120,10 @@ class OBSControl(object):
             else:
                 stabilize_countdown = self.thresholds["stabilize_time"]
 
-            sleep(self.thresholds["check_interval"])
+            self.event.wait(self.thresholds["check_interval"])
+
+    def stop(self):
+        self.event.set()
 
 
 def start_srt(config):
@@ -130,10 +139,14 @@ if __name__ == "__main__":
     srt_thread = start_srt(config)
 
     obs_ctrl = OBSControl(srt_thread=srt_thread)
+    obs_ctrl.daemon = True
+    obs_ctrl.start()
     try:
-        obs_ctrl.run()
+        # There's probably a better way to do this, but this keeps the program running until ctrl+c.
+        while True:
+            sleep(1)
     except KeyboardInterrupt:
         pass
-
+    obs_ctrl.stop
     obs_ctrl.obs_websoc.disconnect()
     srt_thread.stop()

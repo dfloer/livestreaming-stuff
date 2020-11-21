@@ -9,6 +9,8 @@ verify_ssl = true
 obs-websocket = "*"
 obs-websocket-py = "*"
 obs-websocket-p = "*"
+gunicorn = "*"
+falcon = "*"
 
 [requires]
 python_version = "3.8"
