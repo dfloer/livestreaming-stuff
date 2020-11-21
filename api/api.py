@@ -1,6 +1,7 @@
 import json
 import falcon
 import control
+import requests
 
 class Inputs(object):
     def __init__(self, input1, input2, output_pipeline):
@@ -143,17 +144,31 @@ class Stream(object):
 
 
 class StreamControls(object):
-    def __init__(self, pipelines):
-        self.pipelines = pipelines
+    def __init__(self, stream_remote):
+        self.stream_remote = stream_remote
 
     def on_post(self, req, res):
         # post_contents = req.bounded_stream.read()
         if 'start' in req.url:
-            self.pipelines, _ = control.setup(True)
+            # self.pipelines, _ = control.setup(True)
+            self.stream_remote.start_stream()
             msg = "Stream started."
         elif 'stop' in req.url:
-            control.stop_pipelines(self.pipelines)
+            # control.stop_pipelines(self.pipelines)
+            self.stream_remote.stop_stream()
             msg = "Stream stopped."
+        elif 'brb' in req.url:
+            self.stream_remote.brb_stream()
+            msg = "Stream BRBed."
+        elif "back" in req.url:
+            self.stream_remote.back_stream()
+            msg = "Stream backed."
 
         res.body = json.dumps({"message": msg}, ensure_ascii=False)
+        res.status = falcon.HTTP_200
+
+    def on_get(self, req, res):
+        status = self.stream_remote.get_status()
+        print(status)
+        res.body = json.dumps(status, ensure_ascii=False)
         res.status = falcon.HTTP_200

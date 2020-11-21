@@ -77,7 +77,7 @@
 						<td>
 							Audio:
 						</td>
-						<td id="bitrate_steps">
+						<td id="audio_status">
 							loading audio status...
 						</td>
 					</tr>
@@ -85,7 +85,7 @@
 						<td>
 							Stream Status:
 						</td>
-						<td id="bitrate_steps">
+						<td id="stream_status">
 							loading stream status...
 						</td>
 					</tr>
@@ -118,6 +118,9 @@
 			</button>
 			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_down">
 				Bitrate Down
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="status">
+				Status
 			</button>
 		</div>
 	</div>
@@ -159,6 +162,9 @@
 			if (elem.id == "reset_bitrate") {
 				change_bitrate("res");
 				update_table();
+			}
+			if (elem.id == "status") {
+				update_stream_status();
 			}
 			if (elem.id == "mute") {
 				toggle_audio();
@@ -227,7 +233,16 @@
 				});
 			});
 		}
-
+		function update_stream_status() {
+			var url = "http://nano:8000/stream/status";
+			var stream_status = document.querySelector("#stream_status");
+			fetch(url).then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					stream_status.innerHTML = "Streaming: " + res.streaming + ", scene: " + res.scene;
+				});
+			});
+		}
 		async function postData(url = '', data = {}){
 			const response = await fetch(url, {
 				method: 'POST',
@@ -243,12 +258,14 @@
 			postData(url, {});
 		}
 		function start_stream() {
-			var url = "http://nano:8000/start";
+			var url = "http://nano:8000/stream/start";
 			postData(url, {});
+			update_stream_status();
 		}
 		function stop_stream() {
-			var url = "http://nano:8000/stop";
+			var url = "http://nano:8000/stream/stop";
 			postData(url, {});
+			update_stream_status();
 		}
 		function toggle_audio() {
 			var url = "http://nano:8000/audio/toggle";

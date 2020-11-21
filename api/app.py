@@ -1,10 +1,10 @@
 import falcon
 import json
 from os import path, getcwd
-from api import SRT as srt_res
-from api import Inputs as inp_res
-from api import Outputs as out_res
-from api import StreamControls as con_res
+from api import SRT
+from api import Inputs
+from api import Outputs
+from api import StreamControls
 from time import sleep
 
 from srt_stats import SRTThread
@@ -31,10 +31,11 @@ srt_watcher_thread = SRTThread(srt_destination=pipelines["output1"].url)
 srt_watcher_thread.daemon = True
 srt_watcher_thread.start()
 
-srt_stats = srt_res(srt=srt_watcher_thread)
-input_status = inp_res(pipelines["input1"], pipelines["input2"], pipelines["output1"])
-output_status = out_res(pipelines["output1"])
-stream_controls = con_res(pipelines)
+srt_stats = SRT(srt=srt_watcher_thread)
+input_status = Inputs(pipelines["input1"], pipelines["input2"], pipelines["output1"])
+output_status = Outputs(pipelines["output1"])
+remote_controls = control.StreamRemoteControl()
+stream_controls = StreamControls(remote_controls)
 
 bitrate_watcher_thread = control.BitrateWatcherThread(output_status, srt_watcher_thread, debug=True)
 bitrate_watcher_thread.daemon = True
@@ -46,5 +47,8 @@ api.add_route("/inputs/{input_name}", input_status)
 api.add_route("/inputs", input_status)
 api.add_route("/outputs", output_status)
 api.add_route("/outputs/encoder/{bitrate}", output_status)
-api.add_route("/start", stream_controls)
-api.add_route("/stop", stream_controls)
+api.add_route("/stream/start", stream_controls)
+api.add_route("/stream/stop", stream_controls)
+api.add_route("/stream/brb", stream_controls)
+api.add_route("/stream/back", stream_controls)
+api.add_route("/stream/status", stream_controls)

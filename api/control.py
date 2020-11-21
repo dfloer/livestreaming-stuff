@@ -5,6 +5,7 @@ import toml
 import pprint
 import re
 import threading
+import requests
 
 import gstd_streaming as gstds
 from pygstc.gstc import *
@@ -220,6 +221,45 @@ class BitrateWatcherThread(threading.Thread):
         Stops the srt-live-transmit process and the stats-gathering loop.
         """
         self.event.set()
+
+class StreamRemoteControl(object):
+    def __init__(self):
+        self.cfg = read_config()["output1"]
+        self.url = self.cfg["api_url"]
+        self.api_key = self.cfg["api_key"]
+
+    # ToDo: This is all likely going to need a short timeout, or be async.
+    def r_get(self, endpoint='/'):
+        res = requests.get(self.url + endpoint, headers={"X-API-key": self.api_key})
+        return res
+
+    def r_post(self, endpoint='/', data={}):
+        res = requests.post(self.url + endpoint, headers={"X-API-key": self.api_key}, data=data)
+        return res
+
+    def get_status(self):
+        res = self.r_get('/status')
+        return json.loads(res.text)
+
+    def start_stream(self):
+        return self.get_res('/start')
+
+    def stop_stream(self):
+        return self.get_res('/stop')
+
+    def brb_stream(self):
+        return self.get_res('/brb')
+
+    def back_stream(self):
+        return self.get_res('/back')
+
+    def get_res(self, endpoint):
+        r = self.r_post(endpoint)
+        if r.status_code == 200:
+            msg = {"message": "success"}
+        else:
+            msg = {"message": "failure"}
+        return json.dumps(msg)
 
 if __name__ == "__main__":
     # This is a test to swap between inputs and change the bitrate to ensure everything is working correctly.
