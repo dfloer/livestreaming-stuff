@@ -14,8 +14,9 @@ rtt = 150  # If the RTT goes _above_ this number, go brb
 bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb
 running_avg = 5  # To smooth over small blips, this many check_intervals are used to calculate a running average.
 check_interval = 0.1  # seconds. How often to check the stats
-stabilize_time = 5  # How many seconds do we have to be under the thresholds to go return from brb.
+stabilize_time = 2  # How many seconds do we have to be under the thresholds to go return from brb.
 
-
-# [api]
-# listen = "0.0.0.0:9001"
+[api]
+listen = "0.0.0.0:4443"  # ip address and port.
+ssl_path = "ssl/"  # path to SSL certificates to use. These can be self-signed or not. Must contain "ssl.key" and "ssl.crt" files.
+api_key = ""  # In order to authenticate the remote side, put a hard-to-guess API key here. If no key is specified on startup, one will br printed to the console. Make sure the key on the Jetson is the _exact_ same as here.
