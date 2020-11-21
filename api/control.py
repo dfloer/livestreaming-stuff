@@ -4,6 +4,7 @@ from os import path, getcwd
 import toml
 import pprint
 import re
+import threading
 
 import gstd_streaming as gstds
 from pygstc.gstc import *
@@ -11,7 +12,6 @@ from collections import namedtuple
 from time import sleep
 from datetime import datetime
 import subprocess
-
 
 def find_devices():
     """
@@ -173,6 +173,52 @@ def setup(debug):
     return pipelines, pipelines_meta
 
 
+class BitrateWatcherThread(threading.Thread):
+    def __init__(self, output_pipeline, srt_stats, update_interval=0.5, debug=False):
+        self.output_config = read_config()["output1"]
+        self.output_pipe = output_pipeline
+        self.srt = srt_stats
+        self.event = threading.Event()
+        self.rtt_backoff_threshold = self.output_config["backoff_rtt"]
+        self.rtt_normal_threshold = self.output_config["backoff_rtt_normal"]
+        self.cooldown_time = self.output_config["backoff_retry_time"]
+        self.update_interval=update_interval
+        self.backoff = 0
+        self.debug = debug
+        super().__init__(group=None)
+
+    def run(self):
+        bitrate_steps = self.output_pipe.bitrate_steps
+        while not self.event.is_set():
+            cooldown = 0
+            stats = self.srt.last_stats
+            if stats == {}:
+                continue
+            rtt = stats["link"]["rtt"]
+            if self.debug:
+                print("bw:", bitrate_steps, self.output_pipe.current_bitrate, "rtt:", rtt, "backoff:", self.backoff)
+            # To override the backoff behaviour.
+            if self.backoff == -1:
+                continue
+            if self.backoff >= 0 and rtt >= self.rtt_backoff_threshold:
+                self.backoff = max(0, min(self.backoff + 1, len(bitrate_steps)))
+                self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
+                if debug:
+                    print(f"BitrateWatcher: Drop bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
+                cooldown = self.cooldown_time
+            elif self.backoff > 0 and rtt < self.rtt_normal_threshold:
+                self.backoff = max(0, min(self.backoff - 1, len(bitrate_steps)))
+                self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
+                if self.debug:
+                    print(f"BitrateWatcher: Increase bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
+                cooldown = self.cooldown_time
+            self.event.wait(self.update_interval + cooldown)
+
+    def stop(self):
+        """
+        Stops the srt-live-transmit process and the stats-gathering loop.
+        """
+        self.event.set()
 
 if __name__ == "__main__":
     # This is a test to swap between inputs and change the bitrate to ensure everything is working correctly.

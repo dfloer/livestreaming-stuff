@@ -35,6 +35,11 @@ srt_stats = srt_res(srt=srt_watcher_thread)
 input_status = inp_res(pipelines["input1"], pipelines["input2"], pipelines["output1"])
 output_status = out_res(pipelines["output1"])
 stream_controls = con_res(pipelines)
+
+bitrate_watcher_thread = control.BitrateWatcherThread(output_status, srt_watcher_thread, debug=True)
+bitrate_watcher_thread.daemon = True
+bitrate_watcher_thread.start()
+
 api.add_static_route("/static", path.join(getcwd(), "frontend"), fallback_filename='index.html')
 api.add_route("/srt-stats", srt_stats)
 api.add_route("/inputs/{input_name}", input_status)
