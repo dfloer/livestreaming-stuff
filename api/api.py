@@ -58,6 +58,7 @@ class Outputs(object):
         self.bitrate_steps = self.output_pipeline.fallback_bitrates
         self.target_bitrate = self.output_pipeline.bitrate
         self.current_bitrate = self.target_bitrate
+        self.bitrate_locked = False
 
     def as_json(self):
         j = {
@@ -79,12 +80,15 @@ class Outputs(object):
         bitrate_idx = self.bitrate_steps.index(self.current_bitrate)
         if bitrate == "reset":
             self.current_bitrate = self.target_bitrate
+            self.bitrate_locked = False
         elif bitrate == "dec":
             new_idx = max(0, min(bitrate_idx + 1, len(self.bitrate_steps)))
             self.current_bitrate = self.bitrate_steps[new_idx]
+            self.bitrate_locked = True
         elif bitrate == "inc":
             new_idx = max(0, min(bitrate_idx - 1, len(self.bitrate_steps)))
             self.current_bitrate = self.bitrate_steps[new_idx]
+            self.bitrate_locked = True
         else:
             # This might get overwritten by the below.
             res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)

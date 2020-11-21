@@ -196,11 +196,12 @@ class BitrateWatcherThread(threading.Thread):
                 continue
             rtt = stats["link"]["rtt"]
             if self.debug:
-                print("bw:", bitrate_steps, self.output_pipe.current_bitrate, "rtt:", rtt, "backoff:", self.backoff)
+                print("bw:", bitrate_steps, self.output_pipe.current_bitrate, "rtt:", rtt, "backoff:", self.backoff, "locked:", self.output_pipe.bitrate_locked)
             # To override the backoff behaviour.
-            if self.backoff == -1:
-                continue
-            if self.backoff >= 0 and rtt >= self.rtt_backoff_threshold:
+            if self.output_pipe.bitrate_locked:
+                # If the bitrate is manually locked, don't switch, even if we otherwise would be.
+                pass
+            elif self.backoff >= 0 and rtt >= self.rtt_backoff_threshold:
                 self.backoff = max(0, min(self.backoff + 1, len(bitrate_steps)))
                 self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
                 if debug:
