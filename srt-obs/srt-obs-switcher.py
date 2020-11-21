@@ -10,12 +10,13 @@ def get_config(config_file="srt_config.toml"):
     with open(config_file, 'r') as f:
         return toml.load(f)
 
-class OBSControl(object):
+class OBSWebsocket(object):
     def __init__(self, obs_cfg):
         self.config = obs_cfg
         self.ws = None
         self.normal_scene = self.config["scene_name"]
         self.brb_scene = self.config["brb_scene_name"]
+        self.manual_brb = False
         self.connect()
         self.scenes = None
         self.get_scenes()
@@ -30,13 +31,28 @@ class OBSControl(object):
     def get_scenes(self):
         self.scenes = self.ws.call(requests.GetSceneList())
 
-    def go_brb(self):
+    def go_brb(self, manual=False):
         print("brb")
-        self.ws.call(requests.SetCurrentScene(self.brb_scene))
+        if manual:
+            self.manual_brb = True
+        return self.ws.call(requests.SetCurrentScene(self.brb_scene))
 
-    def go_normal(self):
+    def go_normal(self, manual=False):
         print("normal")
-        self.ws.call(requests.SetCurrentScene(self.normal_scene))
+        if manual:
+            self.manual_brb = False
+        return self.ws.call(requests.SetCurrentScene(self.normal_scene))
+
+    def start_stream(self):
+        print("starting stream")
+        return self.ws.call(requests.StartStreaming())
+
+    def stop_stream(self):
+        print("stopping stream")
+        return self.ws.call(requests.StartStreaming())
+
+    def stream_status(self):
+        return self.ws.call(requests.GetStreamingStatus())
 
     @property
     def current_scene(self):
@@ -46,38 +62,30 @@ class OBSControl(object):
         return f"Scenes: {self.scenes}, normal name: {self.normal_scene}, brb name: {self.brb_scene}."
 
 
-if __name__ == "__main__":
-    config = get_config()
+class OBSControl(object):
+    def __init__(self, srt_thread, config_path="srt_config.toml"):
+        self.config = get_config(config_path)
+        self.srt_cfg = self.config["srt_relay"]
+        self.srt_thread = srt_thread
+        self.obs_cfg = self.config["obs"]
+        self.thresholds = self.config["brb_thresholds"]
+        self.brb_scene = self.obs_cfg["brb_scene_name"]
+        self.stabilize_dec = self.thresholds["check_interval"]
+        self.obs_websoc = OBSWebsocket(self.obs_cfg)
+        # Make sure we're on our live scene.
+        self.obs_websoc.go_normal()
 
-    srt_cfg = config["srt_relay"]
-    srt_thread = SRTThread(f"srt://:{srt_cfg['output_port']}", f"srt://:{srt_cfg['listen_port']}")
-
-    srt_thread.daemon = True
-    srt_thread.start()
-
-    obs_cfg = config["obs"]
-    thresholds = config["brb_thresholds"]
-
-    obs_ctrl = OBSControl(obs_cfg)
-
-    brb_scene = obs_cfg["brb_scene_name"]
-
-    stabilize_dec = thresholds["check_interval"]
-    stabilize_countdown = 0
-
-    # Make sure we're on our live scene.
-    obs_ctrl.go_normal()
-
-    ra_samples = thresholds["running_avg"]
-    rtt_samples = [None for _ in range(ra_samples)]
-    bitrate_samples = [None for _ in range(ra_samples)]
-    try:
+    def run(self):
+        ra_samples = self.thresholds["running_avg"]
+        rtt_samples = [None for _ in range(ra_samples)]
+        bitrate_samples = [None for _ in range(ra_samples)]
+        stabilize_countdown = 0
         idx = 0
         while True:
             idx += 1
-            current_scene = obs_ctrl.current_scene
+            current_scene = self.obs_websoc.current_scene
             print(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
-            stats = srt_thread.last_stats
+            stats = self.srt_thread.last_stats
             if stats == {}:
                 continue
 
@@ -86,26 +94,46 @@ if __name__ == "__main__":
             rtt_ra = sum([x for x in rtt_samples if x is not None]) / ra_samples
             bitrate_ra = sum([x for x in bitrate_samples if x is not None]) / ra_samples
 
-            healthy = rtt_ra <= thresholds["rtt"] and bitrate_ra >= thresholds["bitrate"]
-            if "SRT source disconnected" in srt_thread.last_message:
+            healthy = rtt_ra <= self.thresholds["rtt"] and bitrate_ra >= self.thresholds["bitrate"]
+            if "SRT source disconnected" in self.srt_thread.last_message:
                 healthy = False
-            print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}.")
+            print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
             print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}.")
 
-            if healthy:
+            # If scene has been set manually to BRB, don't switch away from the BRB scene.
+            if self.obs_websoc.manual_brb:
+                pass
+            elif healthy:
                 if stabilize_countdown >= 0.0:
-                    stabilize_countdown -= stabilize_dec
-                elif current_scene == brb_scene and stabilize_countdown <= 0.0:
-                    obs_ctrl.go_normal()
-            elif current_scene != brb_scene:
-                obs_ctrl.go_brb()
-                stabilize_countdown = thresholds["stabilize_time"]
+                    stabilize_countdown -= self.stabilize_dec
+                elif current_scene == self.brb_scene and stabilize_countdown <= 0.0:
+                    self.obs_websoc.go_normal()
+            elif current_scene != self.brb_scene:
+                self.obs_websoc.go_brb()
+                stabilize_countdown = self.thresholds["stabilize_time"]
             else:
-                stabilize_countdown = thresholds["stabilize_time"]
+                stabilize_countdown = self.thresholds["stabilize_time"]
 
-            sleep(thresholds["check_interval"])
+            sleep(self.thresholds["check_interval"])
+
+
+def start_srt(config):
+    srt_cfg = config["srt_relay"]
+    srt_thread = SRTThread(f"srt://:{srt_cfg['output_port']}", f"srt://:{srt_cfg['listen_port']}")
+    srt_thread.daemon = True
+    srt_thread.start()
+    return srt_thread
+
+if __name__ == "__main__":
+    config = get_config()
+
+    srt_thread = start_srt(config)
+
+    obs_ctrl = OBSControl(srt_thread=srt_thread)
+    try:
+        obs_ctrl.run()
     except KeyboardInterrupt:
         pass
 
-    obs_ctrl.disconnect()
+    obs_ctrl.obs_websoc.disconnect()
     srt_thread.stop()
