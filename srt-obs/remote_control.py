@@ -40,7 +40,8 @@ class StreamControls(object):
 
     def on_get(self, req, res):
         status = self.obs_websoc.stream_status()
-        j = {"streaming": status.getStreaming(), "recording": status.getRecording()}
+        curr_scene = self.obs_websoc.get_current_scene()
+        j = {"streaming": status.getStreaming(), "recording": status.getRecording(), "scene": curr_scene}
         res.body = json.dumps(j)
         res.status = falcon.HTTP_200
 
@@ -108,7 +109,7 @@ class KeyMiddleware(object):
 
 config = srtos.get_config()
 srt_thread = srtos.start_srt(config)
-debug = True
+debug = False
 
 obs_ctrl = srtos.OBSControl(srt_thread=srt_thread, debug=debug)
 obs_ctrl.daemon = True
@@ -122,4 +123,5 @@ api.add_route("/start", stream_controls, suffix="start")
 api.add_route("/stop", stream_controls, suffix="stop")
 api.add_route("/brb", stream_controls, suffix="brb")
 api.add_route("/back", stream_controls, suffix="back")
+api.add_route("/status", stream_controls)
 api.add_route("/", stream_controls)

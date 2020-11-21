@@ -55,6 +55,10 @@ class OBSWebsocket(object):
     def stream_status(self):
         return self.ws.call(requests.GetStreamingStatus())
 
+    def get_current_scene(self):
+        s = self.ws.call(requests.GetCurrentScene())
+        return s.getName()
+
     @property
     def current_scene(self):
         return self.ws.call(requests.GetCurrentScene()).getName()
