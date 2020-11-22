@@ -227,14 +227,21 @@ class StreamRemoteControl(object):
         self.cfg = read_config()["output1"]
         self.url = self.cfg["api_url"]
         self.api_key = self.cfg["api_key"]
+        self.ssl_pem = self.cfg["ssl_pem"]
+        self.r_session = requests.Session()
+        if self.ssl_pem:
+            self.r_session.verify = self.ssl_pem
+        else:
+            self.r_session.verify = True
+        self.r_session.headers.update({"X-API-key": self.api_key})
 
     # ToDo: This is all likely going to need a short timeout, or be async.
     def r_get(self, endpoint='/'):
-        res = requests.get(self.url + endpoint, headers={"X-API-key": self.api_key})
+        res = self.r_session.get(self.url + endpoint)
         return res
 
     def r_post(self, endpoint='/', data={}):
-        res = requests.post(self.url + endpoint, headers={"X-API-key": self.api_key}, data=data)
+        res = self.r_session.post(self.url + endpoint, data=data)
         return res
 
     def get_status(self):
