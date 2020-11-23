@@ -128,11 +128,23 @@
 							<button type="button" onclick="button_click(this)" class="btn btn-sm btn-warning" name="reset_bitrate" id="reset_bitrate">
 								Reset Bitrate
 							</button>
-							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_up">
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="bitrate_up" id="bitrate_up">
 								Bitrate Up
 							</button>
-							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_down">
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="bitrate_down" id="bitrate_down">
 								Bitrate Down
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link collapsed" data-toggle="collapse" data-parent="#card-1" href="#card-element-3">Scenes</a>
+					</div>
+					<div id="card-element-3" class="collapse">
+						<div class="card-body">
+							<button type="button" onclick="button_click(this)" class="btn btn-secondary btn-sm" name="brb" id="brb">
+								Live Scene
 							</button>
 						</div>
 					</div>
@@ -159,6 +171,7 @@
 	<script src="js/scripts.js"></script>
 	<script>
 		var refresh_stats = true;
+		var is_brb = false;
 		var muted = false;
 		update_table()
 		update_stream_status()
@@ -233,6 +246,9 @@
 					refresh_button.className += " btn-primary";
 				}
 			}
+			if (elem.id == "brb") {
+				handle_scene(true);
+			}
 		}
 		function update_table() {
 			var base_url = "http://nano:8000";
@@ -283,6 +299,13 @@
 				response.text().then(function(text) {
 					var res = JSON.parse(text);
 					stream_status.innerHTML = "Streaming: " + res.streaming + ", scene: " + res.scene;
+					console.log(res.scene)
+					if (res.scene == "BRB") {
+						is_brb = true;
+					} else {
+						is_brb = false;
+					}
+					handle_scene(false);
 				});
 			});
 		}
@@ -318,6 +341,10 @@
 			var url = "http://nano:8000/audio/" + input_name;
 			var pd = postData(url, {});
 		}
+		function switch_scene(scene) {
+			var url = "http://nano:8000/stream/" + scene;
+			var pd = postData(url, {});
+		}
 		function change_bitrate(dir) {
 			var url = "http://nano:8000/outputs/encoder";
 			if(dir == "inc") {
@@ -330,6 +357,27 @@
 				url += "/reset"
 			}
 			postData(url, {});
+		}
+		function handle_scene(do_switch) {
+			var brb_button = document.querySelector("#brb");
+			if(is_brb == true) {
+				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				brb_button.className += " btn-secondary";
+				brb_button.innerHTML = "Live Scene";
+				is_brb = false;
+				if (do_switch == true) {
+					switch_scene("brb")
+				}
+			} else {
+				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				brb_button.className += " btn-primary";
+				brb_button.innerHTML = "BRB scene";
+				is_brb = true;
+				if (do_switch == true) {
+					switch_scene("back")
+				}
+
+			}
 		}
 	</script>
 
