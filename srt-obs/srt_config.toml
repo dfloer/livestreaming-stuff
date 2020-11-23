@@ -1,6 +1,7 @@
 [srt_relay]
 listen_port = 4000  # port for the SRT relay to listen on
 output_port = 9000  # port for the SRT relaythat OBS connects to
+encryption_passphrase = ''  # SRT passphrase for encryption. If this is blank, one will be generated and printed in the console. This exact same key needs to be on the Nano as well.
 
 [obs]
 websocket_host = "obs-host"  # hostname of the computer running obs/obs-websocket

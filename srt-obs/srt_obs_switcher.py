@@ -132,7 +132,8 @@ class OBSControl(threading.Thread):
 
 def start_srt(config):
     srt_cfg = config["srt_relay"]
-    srt_thread = SRTThread(f"srt://:{srt_cfg['output_port']}", f"srt://:{srt_cfg['listen_port']}")
+    srt_passphrase = srt_cfg["encryption_passphrase"]
+    srt_thread = SRTThread(f"srt://:{srt_cfg['output_port']}", f"srt://:{srt_cfg['listen_port']}", passphrase=srt_passphrase)
     srt_thread.daemon = True
     srt_thread.start()
     return srt_thread
