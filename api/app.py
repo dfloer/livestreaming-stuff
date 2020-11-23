@@ -26,9 +26,9 @@ class StaticResource(object):
 
 api = application = falcon.API()
 
-pipelines, pipelines_meta = control.setup(debug=True)
+pipelines, pipelines_meta, srt_passphrase = control.setup(debug=True)
 
-srt_watcher_thread = SRTThread(srt_destination=pipelines["output1"].url)
+srt_watcher_thread = SRTThread(passphrase=srt_passphrase, srt_destination=pipelines["output1"].url)
 srt_watcher_thread.daemon = True
 srt_watcher_thread.start()
 

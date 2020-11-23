@@ -183,7 +183,9 @@ def setup(debug):
     encoder_name = [x for x in pipelines["output1"].list_elements() if "nvv4l2h265enc" in x["name"]][0]["name"]
     pipelines["output1"].encoder = encoder_name
     pipelines["output1"].set_bitrate()
-    return pipelines, pipelines_meta
+
+    srt_passphrase = config["output1"]["srt_passphrase"]
+    return pipelines, pipelines_meta, srt_passphrase
 
 
 class BitrateWatcherThread(threading.Thread):

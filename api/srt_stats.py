@@ -6,7 +6,7 @@ from os import set_blocking
 
 
 class SRTThread(threading.Thread):
-    def __init__(self, srt_destination, srt_source="udp://:4200", stats_interval=100, update_interval=0.1):
+    def __init__(self, passphrase, srt_destination, srt_source="udp://:4200", stats_interval=100, update_interval=0.1):
         """
         Wrapper thread to start/stop srt-live-transmit and get stats out of it.
         Source and destination as per documentation at: https://github.com/Haivision/srt/blob/master/docs/srt-live-transmit.md
@@ -20,8 +20,9 @@ class SRTThread(threading.Thread):
         self.event = threading.Event()
         self.stats_interval = stats_interval
         self.update_interval = update_interval
+        self.passphrase = passphrase
         self.src_conn = srt_source
-        self.dst_conn = srt_destination
+        self.dst_conn = f"{srt_destination}?passphrase={self.passphrase}&enforcedencryption=true"
         self.srt_process = self.start_process()
         set_blocking(self.srt_process.stdout.fileno(), False)
         self.last_message = ''
@@ -45,7 +46,7 @@ class SRTThread(threading.Thread):
         """
         Start the SRT process.
         """
-        srt_cmd = f"srt-live-transmit -srctime -buffering 1 -s {self.stats_interval} -pf json {self.src_conn} {self.dst_conn}"
+        srt_cmd = f"srt-live-transmit -srctime -buffering 1 -s {self.stats_interval} -pf json {self.src_conn} \"{self.dst_conn}\""
         return subprocess.Popen(
             f"{srt_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
