@@ -99,14 +99,20 @@ class Output(Pipeline):
     url: str
     bitrate: int
     fallback_bitrates: list
+    url: str
+    audio_mute: bool
+    volume_element: str
     def __init__(self, gstdclient, name, config, encoder_config, debug=False):
         self.encoder = ''
         self.bitrate = encoder_config["preferred_bitrate"]
         self.fallback_bitrates = encoder_config["fallback_bitrates"]
         self.url = config["url"]
+        self.audio_mute = False
         super().__init__(gstdclient, name, config, debug)
+        self.volume_element = [x['name'] for x in self.list_elements() if "volume" in x['name']][0]
 
     def switch_src(self, new_src):
+        new_src = new_src + "-video"
         if self.debug:
             self.print_debug(f"Switching pipeline: {self.name} to source {new_src}")
         self.set_property(self.name, 'listen-to', new_src)
@@ -120,3 +126,34 @@ class Output(Pipeline):
         self.client.element_set(self.name, self.encoder, "bitrate", new_val)
         text_elem_name = [x["name"] for x in self.list_elements() if "textoverlay" in x["name"]][0]
         self.set_property(text_elem_name, "text", f"bitrate: {val / 1000}kb/s")
+
+    def toggle_audio_mute(self):
+        """
+        Toggle the muting of the audio. If muted, unmute. It unmuted, mute.
+        """
+        self.audio_mute = not self.audio_mute
+        if self.debug:
+            self.print_debug(f"Audio mute status: {self.audio_mute}")
+        self.set_property(self.volume_element, "mute", self.audio_mute)
+
+    def set_volume(self, volume):
+        """
+        Set the audio output volume.
+        Args:
+            volume (float): Volume level to set. 0=0%, 1.0=100%. Volumes higher than 1.0 work (up to 10.0 or so) but are amplification.
+        """
+        if self.debug:
+            self.print_debug(f"Volume set to : {volume}")
+        self.set_property(self.volume_element, "mute", self.audio_mute)
+
+
+    def switch_audio_src(self, new_src):
+        """
+        Switch to the given audio source/
+        Args:
+            new_src (str): Name of the input to switch to. Does not need the "-audio".
+        """
+        new_src = new_src + "-audio"
+        if self.debug:
+            self.print_debug(f"Switching audio: {self.name} to source {new_src}")
+        self.set_property(self.name + "-audio", 'listen-to', new_src)

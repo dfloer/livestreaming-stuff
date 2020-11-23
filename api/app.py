@@ -5,6 +5,7 @@ from api import SRT
 from api import Inputs
 from api import Outputs
 from api import StreamControls
+from api import AudioControls
 from time import sleep
 
 from srt_stats import SRTThread
@@ -36,6 +37,7 @@ input_status = Inputs(pipelines["input1"], pipelines["input2"], pipelines["outpu
 output_status = Outputs(pipelines["output1"])
 remote_controls = control.StreamRemoteControl()
 stream_controls = StreamControls(remote_controls)
+audio_controls = AudioControls(pipelines["output1"])
 
 bitrate_watcher_thread = control.BitrateWatcherThread(output_status, srt_watcher_thread, debug=True)
 bitrate_watcher_thread.daemon = True
@@ -52,3 +54,6 @@ api.add_route("/stream/stop", stream_controls)
 api.add_route("/stream/brb", stream_controls)
 api.add_route("/stream/back", stream_controls)
 api.add_route("/stream/status", stream_controls)
+api.add_route("/audio/", audio_controls)
+api.add_route("/audio/mute", audio_controls, suffix="mute")
+api.add_route("/audio/{input_name}", audio_controls, suffix="name")

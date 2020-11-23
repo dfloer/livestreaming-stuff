@@ -6,6 +6,7 @@ import pprint
 import re
 import threading
 import requests
+import alsaaudio
 
 import gstd_streaming as gstds
 from pygstc.gstc import *
@@ -16,9 +17,10 @@ import subprocess
 
 def find_devices():
     """
-    Used to determine the device node of the different devices.
+    Used to determine the device node of the different devices, and the alsa devices for the audio.
     Returns:
-        Dictionary, with the being the name of the device, and the value a list of ["/dev/videoX", "usb-id"].
+        Dictionary, with the being the name of the device, and the value a list of ["/dev/videoX", "usb-id", "alsa-index"].
+            This is the device node, the USB-id and the related alsa audio device index.
     """
     res = subprocess.run(
         ["v4l2-ctl", "--list-devices"], stdout=subprocess.PIPE, universal_newlines=True
@@ -27,12 +29,17 @@ def find_devices():
     # 'Cam Link 4K (usb-70090000.xusb-1.4):'
     # '   /dev/video0'
     cleaned = [x for x in res.stdout.split("\n") if x != ""]
+    audio_devices = {x: alsaaudio.card_name(x) for x in alsaaudio.card_indexes()}
     devices = {}
     for idx in range(0, len(cleaned), 2):
         dev = cleaned[idx + 1][1:]
         name, usb = cleaned[idx][:-2].split(" (usb-")
         usb = "usb-" + usb
-        devices[name] = [dev, usb]
+        audio_idx = -1
+        for k, v in audio_devices.items():
+            if name in v:
+                audio_idx = k
+        devices[name] = [dev, usb, audio_idx]
     return devices
 
 
@@ -86,7 +93,9 @@ def create_pipelines(client, config, debug=False):
 
     devices = find_devices()
     input1_dev = [devices[x] for x in devices.keys() if input1_config['name'] in x][0][0]
+    input1_audio_dev = [devices[x] for x in devices.keys() if input1_config['name'] in x][0][2]
     input2_dev = [devices[x] for x in devices.keys() if input2_config['name'] in x][0][0]
+    input2_audio_dev = [devices[x] for x in devices.keys() if input2_config['name'] in x][0][2]
 
     if debug:
         print(f"Connected devices: {devices}")
@@ -106,12 +115,14 @@ def create_pipelines(client, config, debug=False):
     interpipe_sink_options = (
         "sync=false async=false forward-events=true forward-eos=true"
     )
-    input1_gst = f"v4l2src device={input1_dev} ! {input1_config['gst']} ! interpipesink name=input1 {interpipe_sink_options}"
+    input1_audio_gst = f"alsasrc device=hw:{input1_audio_dev} ! identity name=delay signal-handoffs=TRUE"
+    input1_gst = f"v4l2src device={input1_dev} ! {input1_config['gst']} ! interpipesink name=input1-video {interpipe_sink_options} {input1_audio_gst} ! interpipesink name=input1-audio"# {interpipe_sink_options}"
     if debug:
         print("input1 gst:", input1_gst)
     input1_config["full_gst"] = input1_gst
     input1 = gstds.Pipeline(gstdclient=client, name="input1", config=input1_config, debug=debug)
-    input2_gst = f"v4l2src device={input2_dev} ! {input2_config['gst']} ! interpipesink name=input2 {interpipe_sink_options}"
+    input2_audio_gst = f"alsasrc device=hw:{input2_audio_dev} ! identity name=delay signal-handoffs=TRUE"
+    input2_gst = f"v4l2src device={input2_dev} ! {input2_config['gst']} ! interpipesink name=input2-video {interpipe_sink_options} {input2_audio_gst} ! interpipesink name=input2-audio"# {interpipe_sink_options}"
     if debug:
         print("input2 gst:", input2_gst)
     input2_config["full_gst"] = input2_gst
@@ -120,17 +131,18 @@ def create_pipelines(client, config, debug=False):
     pipelines = {"input1": input1, "input2": input2}
 
     output1_inter = (
-        f"interpipesrc format=time listen-to={initial_input} block=true name=output1"
+        f"interpipesrc format=time listen-to={initial_input}-video block=true name=output1 stream-sync=1"
     )
+    output1_audio_inter = f"interpipesrc listen-to={initial_input}-audio is-live=true name=output1-audio  ! volume volume=1.0 mute=false ! audioconvert ! avenc_aac bitrate=163840 ! aacparse ! queue ! mux."
 
 
     # This is messy and should probably be handled elsewhere.
     # But the name of the encoder sometimes changes if gstd isn't restarted between invocations of this program.
     # So we find the current name. The number at the end is what changes.
     protocol, hostname, port = parse_url(output_config['url'])
-    output1_sink = f"h265parse ! mpegtsmux ! rndbuffersize max=1316 min=1316 ! udpsink host=localhost port=4200"
-    encoder_input = f"nvvidconv !  textoverlay text=bitrate: ! nvvidconv "
-    output1_gst = f"{output1_inter} ! {encoder_input} ! {encoder_config['gst']} ! {output1_sink}"
+    output1_sink = f"h265parse ! mux. mpegtsmux name=mux ! rndbuffersize max=1316 min=1316 ! udpsink host=localhost port=4200"
+    encoder_input = f"nvvidconv ! textoverlay text=bitrate: ! nvvidconv "
+    output1_gst = f"{output1_inter} ! {encoder_input} ! {encoder_config['gst']} ! {output1_sink} {output1_audio_inter}"
     if debug:
         print("output1 gst:", output1_gst)
 

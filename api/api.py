@@ -172,3 +172,25 @@ class StreamControls(object):
         print(status)
         res.body = json.dumps(status, ensure_ascii=False)
         res.status = falcon.HTTP_200
+
+class AudioControls(object):
+    def __init__(self, output_pipe):
+        self.output_pipe = output_pipe
+
+    def on_get(self, req, res):
+        active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
+        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute}, ensure_ascii=False)
+        res.status = falcon.HTTP_200
+
+    def on_post_mute(self, req, res):
+        self.output_pipe.toggle_audio_mute()
+        active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
+        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute}, ensure_ascii=False)
+        res.status = falcon.HTTP_200
+
+    def on_post_name(self, req, res, input_name):
+        print(f"Switch to input {input_name}.")
+        self.output_pipe.switch_audio_src(input_name)
+        active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
+        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute}, ensure_ascii=False)
+        res.status = falcon.HTTP_200

@@ -101,27 +101,55 @@
 			<button type="button"  onclick="button_click(this)" class="btn btn-lg btn-block btn-info" name="go_live" id="go_live">
 				Go Live!
 			</button>
-			<button type="button" onclick="button_click(this)" class="btn btn-lg btn-warning" name="reset_bitrate" id="reset_bitrate">
-				Reset Bitrate
-			</button>
-			<button type="button" onclick="button_click(this)" class="btn btn-danger btn-sm" name="stop" id="stop">
-				Stop
-			</button>
 			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="refresh" id="refresh">
 				Refresh
-			</button>
-			<button type="button" onclick="button_click(this)" class="btn btn-success btn-md" name="mute" id="mute">
-				Mute Audio
-			</button>
-			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_up">
-				Bitrate Up
-			</button>
-			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_down">
-				Bitrate Down
 			</button>
 			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="status">
 				Status
 			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-success btn-md" name="mute" id="mute">
+				Mute Audio
+			</button>
+			<div class="btn-group" role="group">
+				<button class="btn btn-primary" onclick="button_click(this)" type="button" id="audio-input1">
+					Input 1
+				</button>
+				<button class="btn btn-primary" onclick="button_click(this)" type="button" id="audio-input2">
+					Input 2
+				</button>
+			</div>
+			<div id="card-1">
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link" data-toggle="collapse" data-parent="#card-1" href="#card-element-1">Bitrate Controls</a>
+					</div>
+					<div id="card-element-1" class="collapse">
+						<div class="card-body">
+							<button type="button" onclick="button_click(this)" class="btn btn-sm btn-warning" name="reset_bitrate" id="reset_bitrate">
+								Reset Bitrate
+							</button>
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_up">
+								Bitrate Up
+							</button>
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="bitrate_down">
+								Bitrate Down
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link collapsed" data-toggle="collapse" data-parent="#card-1" href="#card-element-2">Danger Zone</a>
+					</div>
+					<div id="card-element-2" class="collapse">
+						<div class="card-body">
+							<button type="button" onclick="button_click(this)" class="btn btn-danger btn-sm" name="stop" id="stop">
+								Stop
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
 </div>
@@ -184,6 +212,12 @@
 					refresh_button.innerHTML = "Mute Audio"
 				}
 			}
+			if (elem.id == "audio-input1") {
+				audio_input("input1");
+			}
+			if (elem.id == "audio-input2") {
+				audio_input("input2");
+			}
 			if (elem.id == "refresh") {
 				var refresh_button = document.querySelector("#refresh");
 				if(refresh_stats == true) {
@@ -207,6 +241,7 @@
 			var bitrate_steps = document.querySelector("#bitrate_steps");
 			var current_bitrate = document.querySelector("#current_bitrate");
 			var current_input = document.querySelector("#current_input");
+			var audio = document.querySelector("#audio_status");
 
 			fetch(base_url + "/srt-stats").then(function(response) {
 				response.text().then(function(text) {
@@ -231,6 +266,13 @@
 					var res = JSON.parse(text);
 					var input_str = res.nice_name
 					current_input.innerHTML = "<strong>" + input_str + "</strong>";
+				});
+			});
+			fetch(base_url + "/audio").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var input_str = res.nice_name
+					audio.innerHTML = "Input: " + res.active + ", muted: " + res.muted;
 				});
 			});
 		}
@@ -269,9 +311,12 @@
 			update_stream_status();
 		}
 		function toggle_audio() {
-			var url = "http://nano:8000/audio/toggle";
+			var url = "http://nano:8000/audio/mute";
 			var pd = postData(url, {});
-			console.log(pd);
+		}
+		function audio_input(input_name) {
+			var url = "http://nano:8000/audio/" + input_name;
+			var pd = postData(url, {});
 		}
 		function change_bitrate(dir) {
 			var url = "http://nano:8000/outputs/encoder";
