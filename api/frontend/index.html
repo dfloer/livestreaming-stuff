@@ -114,7 +114,7 @@
 				<button class="btn btn-primary" onclick="button_click(this)" type="button" id="audio-input1">
 					Input 1
 				</button>
-				<button class="btn btn-primary" onclick="button_click(this)" type="button" id="audio-input2">
+				<button class="btn btn-secondary" onclick="button_click(this)" type="button" id="audio-input2">
 					Input 2
 				</button>
 			</div>
@@ -293,6 +293,7 @@
 						mute_status = "<strong>" + mute_status + "</strong>"
 					}
 					audio.innerHTML = "Input: " + res.active + ", muted: " + mute_status;
+					update_audio_toggle(res.active);
 				});
 			});
 		}
@@ -381,6 +382,21 @@
 					switch_scene("back")
 				}
 
+			}
+		}
+		function update_audio_toggle(active) {
+			var audio1_button = document.querySelector("#audio-input1");
+			var audio2_button = document.querySelector("#audio-input2");
+			if(active == "input1-audio") {
+				audio2_button.className = audio2_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				audio2_button.className += " btn-secondary";
+				audio1_button.className = audio1_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				audio1_button.className += " btn-primary";
+			} else {
+				audio1_button.className = audio1_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				audio1_button.className += " btn-secondary";
+				audio2_button.className = audio2_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				audio2_button.className += " btn-primary";
 			}
 		}
 	</script>
