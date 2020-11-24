@@ -170,6 +170,7 @@
     <script src="js/bootstrap.min.js"></script>
 	<script src="js/scripts.js"></script>
 	<script>
+		var base_url = window.location.origin;
 		var refresh_stats = true;
 		var is_brb = false;
 		var muted = false;
@@ -251,7 +252,6 @@
 			}
 		}
 		function update_table() {
-			var base_url = "http://nano:8000";
 			var srt_stats = document.querySelector("#srt_stats");
 			var srt_output = document.querySelector("#srt_output");
 			var bitrate_steps = document.querySelector("#bitrate_steps");
@@ -297,7 +297,7 @@
 			});
 		}
 		function update_stream_status() {
-			var url = "http://nano:8000/stream/status";
+			var url = base_url + "/stream/status";
 			var stream_status = document.querySelector("#stream_status");
 			fetch(url).then(function(response) {
 				response.text().then(function(text) {
@@ -324,33 +324,33 @@
 			return response;
 		}
 		function switch_input() {
-			var url = "http://nano:8000/inputs/swap";
+			var url = base_url + "/inputs/swap";
 			postData(url, {});
 		}
 		function start_stream() {
-			var url = "http://nano:8000/stream/start";
+			var url = base_url + "/stream/start";
 			postData(url, {});
 			update_stream_status();
 		}
 		function stop_stream() {
-			var url = "http://nano:8000/stream/stop";
+			var url = base_url + "/stream/stop";
 			postData(url, {});
 			update_stream_status();
 		}
 		function toggle_audio() {
-			var url = "http://nano:8000/audio/mute";
+			var url = base_url + "/audio/mute";
 			var pd = postData(url, {});
 		}
 		function audio_input(input_name) {
-			var url = "http://nano:8000/audio/" + input_name;
+			var url = base_url + "/audio/" + input_name;
 			var pd = postData(url, {});
 		}
 		function switch_scene(scene) {
-			var url = "http://nano:8000/stream/" + scene;
+			var url = base_url + "/stream/" + scene;
 			var pd = postData(url, {});
 		}
 		function change_bitrate(dir) {
-			var url = "http://nano:8000/outputs/encoder";
+			var url = base_url + "/outputs/encoder";
 			if(dir == "inc") {
 				url += "/inc"
 			}
