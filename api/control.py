@@ -133,7 +133,7 @@ def create_pipelines(client, config, debug=False):
     output1_inter = (
         f"interpipesrc format=time listen-to={initial_input}-video block=true name=output1 stream-sync=1"
     )
-    output1_audio_inter = f"interpipesrc listen-to={initial_input}-audio is-live=true name=output1-audio  ! volume volume=1.0 mute=false ! audioconvert ! avenc_aac bitrate=163840 ! aacparse ! queue ! mux."
+    output1_audio_inter = f"interpipesrc format=time listen-to={initial_input}-audio is-live=true name=output1-audio  ! volume volume=1.0 mute=false ! audioconvert ! avenc_aac bitrate=163840 ! aacparse ! queue ! mux."
 
 
     # This is messy and should probably be handled elsewhere.
