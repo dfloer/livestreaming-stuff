@@ -2,6 +2,7 @@ import json
 import falcon
 import control
 import requests
+import urllib
 
 class Inputs(object):
     def __init__(self, input1, input2, output_pipeline):
@@ -128,15 +129,49 @@ class SRT(object):
         except Exception:
             # Sometimes the stats are blank, so we'll just send the 0'd json.
             pass
+        censored_url = self.censor_url()
         doc = {
             "stats": self.stats,
-            "output": self.srt_output.dst_conn,
+            "output": censored_url,
             "message": str(self.srt_message)
         }
 
         res.body = json.dumps(doc, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
+    def censor_url(self, raw_url=None, mode="partial"):
+        """
+        Censors the SRT URL, in case the display might be shown. Leaking full connection info could be bad.
+        Args:
+            raw_url (str, optional): Uncensored url, if None, use this object's SRT URL. Defaults to None.
+            mode (str, optional): Mode to censor the URL with. Defaults to "passphrase".
+                "passphrase" replaces the passphrase with 4 *s.
+                "full" replaces everything useful with ****s.
+                "partial" replaces some useful information. This includes the passphrase, and most but not all the characters of the host.
+                "none" does nothing, the full, uncensored URL.
+        Returns
+            (str): The censored version of the URL
+        """
+        if not raw_url:
+            raw_url = self.srt_output.dst_conn
+        if mode == "none":
+            return raw_url
+        if mode == "full":
+            return "[REDACTED]"
+        parsed = urllib.parse.urlsplit(raw_url)
+        netloc = parsed.netloc
+        scheme = parsed.scheme
+        qs = urllib.parse.parse_qs(parsed.query)
+        # All modes that aren't none censor the passphrase.
+        qs["passphrase"] = "****"
+        if mode == "partial":
+            s = netloc.split('.')
+            tld, port = s[-1].split(':')
+            netloc = f"{s[0][ : 2]}****.{tld}:{port}"
+        qs = urllib.parse.urlencode(qs, doseq=True).replace("%2A", '*')
+        url_parts = (scheme, netloc, '', qs, '')
+        new_url = urllib.parse.urlunsplit(url_parts)
+        return new_url
 
 class Stream(object):
     def __init__(self, output=''):

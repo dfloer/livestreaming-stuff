@@ -287,8 +287,12 @@
 			fetch(base_url + "/audio").then(function(response) {
 				response.text().then(function(text) {
 					var res = JSON.parse(text);
-					var input_str = res.nice_name
-					audio.innerHTML = "Input: " + res.active + ", muted: " + res.muted;
+					var input_str = res.nice_name;
+					var mute_status = res.muted;
+					if (mute_status == true) {
+						mute_status = "<strong>" + mute_status + "</strong>"
+					}
+					audio.innerHTML = "Input: " + res.active + ", muted: " + mute_status;
 				});
 			});
 		}
