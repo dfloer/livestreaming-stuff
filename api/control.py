@@ -170,11 +170,12 @@ def stop_pipelines(pipelines):
         print(f"[{datetime.now()}] Attempting to cleanup {p.name}.")
         p.cleanup()
 
-def setup(debug):
+def setup():
     """
     Convenience function to set everything up.
     """
     config = read_config()
+    debug = config["api_server"]["debug"]
 
     client = GstdClient()
     pipelines, pipelines_meta = create_pipelines(client, config, debug=debug)
@@ -189,8 +190,9 @@ def setup(debug):
 
 
 class BitrateWatcherThread(threading.Thread):
-    def __init__(self, output_pipeline, srt_stats, update_interval=0.5, debug=False):
-        self.output_config = read_config()["output1"]
+    def __init__(self, output_pipeline, srt_stats, update_interval=0.5):
+        self.config = read_config()
+        self.output_config = self.config["output1"]
         self.output_pipe = output_pipeline
         self.srt = srt_stats
         self.event = threading.Event()
@@ -199,7 +201,7 @@ class BitrateWatcherThread(threading.Thread):
         self.cooldown_time = self.output_config["backoff_retry_time"]
         self.update_interval=update_interval
         self.backoff = 0
-        self.debug = debug
+        self.debug = self.config["api_server"]["debug"]
         super().__init__(group=None)
 
     def run(self):

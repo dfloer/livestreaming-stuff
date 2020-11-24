@@ -26,7 +26,8 @@ class StaticResource(object):
 
 api = application = falcon.API()
 
-pipelines, pipelines_meta, srt_passphrase = control.setup(debug=True)
+
+pipelines, pipelines_meta, srt_passphrase = control.setup()
 
 srt_watcher_thread = SRTThread(passphrase=srt_passphrase, srt_destination=pipelines["output1"].url)
 srt_watcher_thread.daemon = True
@@ -39,7 +40,7 @@ remote_controls = control.StreamRemoteControl()
 stream_controls = StreamControls(remote_controls)
 audio_controls = AudioControls(pipelines["output1"])
 
-bitrate_watcher_thread = control.BitrateWatcherThread(output_status, srt_watcher_thread, debug=True)
+bitrate_watcher_thread = control.BitrateWatcherThread(output_status, srt_watcher_thread)
 bitrate_watcher_thread.daemon = True
 bitrate_watcher_thread.start()
 
