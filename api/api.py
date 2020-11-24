@@ -84,29 +84,26 @@ class Outputs(object):
             self.current_bitrate = self.target_bitrate
             self.bitrate_locked = False
         elif bitrate == "dec":
-            new_idx = max(0, min(bitrate_idx + 1, len(self.bitrate_steps)))
+            new_idx = max(0, min(bitrate_idx + 1, len(self.bitrate_steps) - 1))
             self.current_bitrate = self.bitrate_steps[new_idx]
             self.bitrate_locked = True
         elif bitrate == "inc":
-            new_idx = max(0, min(bitrate_idx - 1, len(self.bitrate_steps)))
+            new_idx = max(0, min(bitrate_idx - 1, len(self.bitrate_steps) - 1))
             self.current_bitrate = self.bitrate_steps[new_idx]
             self.bitrate_locked = True
         else:
-            # This might get overwritten by the below.
-            res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
-            res.status = falcon.HTTP_400
-        try:
-            bitrate = int(json.loads(post_contents)["current_bitrate"])
-            if bitrate in self.bitrate_steps:
-                self.current_bitrate = bitrate
-                res.status = falcon.HTTP_200
-                res.body = self.as_json()
-            else:
+            try:
+                bitrate = int(json.loads(post_contents)["current_bitrate"])
+                if bitrate in self.bitrate_steps:
+                    self.current_bitrate = bitrate
+                    res.status = falcon.HTTP_200
+                    res.body = self.as_json()
+                else:
+                    res.status = falcon.HTTP_400
+                    res.body = json.dumps({"error": "bitrate not in bitrate_steps"}, ensure_ascii=False)
+            except Exception:
+                res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
                 res.status = falcon.HTTP_400
-                res.body = json.dumps({"error": "bitrate not in bitrate_steps"}, ensure_ascii=False)
-        except Exception:
-            res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
-            res.status = falcon.HTTP_400
         self.output_pipeline.set_bitrate(self.current_bitrate)
 
 class SRT(object):
