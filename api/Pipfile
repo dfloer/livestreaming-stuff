@@ -8,3 +8,6 @@ verify_ssl = true
 [packages]
 falcon = "*"
 gunicorn = "*"
+toml = "*"
+requests = "*"
+pyalsaaudio = "*"
