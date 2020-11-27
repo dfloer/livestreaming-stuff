@@ -6,6 +6,7 @@ from api import Inputs
 from api import Outputs
 from api import StreamControls
 from api import AudioControls
+from api import StreamOutput
 from time import sleep
 
 from srt_stats import SRTThread
@@ -39,6 +40,7 @@ output_status = Outputs(pipelines["output1"])
 remote_controls = control.StreamRemoteControl()
 stream_controls = StreamControls(remote_controls)
 audio_controls = AudioControls(pipelines["output1"])
+output_controls = StreamOutput(pipelines["output1"])
 
 bitrate_watcher_thread = control.BitrateWatcherThread(output_status, srt_watcher_thread)
 bitrate_watcher_thread.daemon = True
@@ -48,6 +50,8 @@ api.add_static_route("/static", path.join(getcwd(), "frontend"), fallback_filena
 api.add_route("/srt-stats", srt_stats)
 api.add_route("/inputs/{input_name}", input_status)
 api.add_route("/inputs", input_status)
+api.add_route("/outputs/play", output_controls, suffix="play")
+api.add_route("/outputs/pause", output_controls, suffix="pause")
 api.add_route("/outputs", output_status)
 api.add_route("/outputs/encoder/{bitrate}", output_status)
 api.add_route("/stream/start", stream_controls)

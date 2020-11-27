@@ -43,10 +43,10 @@
 					</tr>
 					<tr class="table-active">
 						<td>
-							Current Bitrate
+							Output Info:
 						</td>
 						<td id="current_bitrate">
-							<strong>loading bitrate...</strong>
+							<strong>loading bitrate/state...</strong>
 						</td>
 					</tr>
 					<tr>
@@ -161,6 +161,20 @@
 						</div>
 					</div>
 				</div>
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link collapsed" data-toggle="collapse" data-parent="#card-1" href="#card-element-4">Pause/Play</a>
+					</div>
+					<div id="card-element-4" class="collapse">
+						<div class="card-body">
+							<div class="btn-group" role="group">
+								<button type="button" onclick="button_click(this)" class="btn btn-sm btn-success" name="pause" id="pause">
+									Play Output
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -174,8 +188,10 @@
 		var refresh_stats = true;
 		var is_brb = false;
 		var muted = false;
-		update_table()
-		update_stream_status()
+		var is_paused = false;
+		update_table();
+		update_stream_status();
+		handle_pause(false);
 		var update_interval = setInterval(update_table, 1000);
 		function button_click(elem) {
 			console.log(elem.id);
@@ -247,6 +263,9 @@
 					refresh_button.className += " btn-primary";
 				}
 			}
+			if (elem.id == "pause") {
+				handle_pause(true);
+			}
 			if (elem.id == "brb") {
 				handle_scene(true);
 			}
@@ -272,7 +291,17 @@
 					var res = JSON.parse(text);
 					var bitrate_str = res.current_bitrate / 1000000 + " Mb/s";
 					var steps_str = res.bitrate_steps;
-					current_bitrate.innerHTML = "<strong>" + bitrate_str + "</strong>";
+					console.log(res.state)
+					if (res.state != "PLAYING") {
+						is_paused = true;
+					} else {
+						is_paused = false;
+					}
+					var paused = is_paused
+					if (is_paused == true) {
+						paused = "<strong>" + is_paused + "</strong>"
+					}
+					current_bitrate.innerHTML = "<strong>" + bitrate_str + "</strong>" + "&nbsp;&nbsp;&nbsp;&nbsp;paused: " + paused;
 					var nice_steps = steps_str.map(x => x / 1000000 + "Mb/s");
 					bitrate_steps.textContent = nice_steps.join(", ");
 				});
@@ -281,7 +310,7 @@
 				response.text().then(function(text) {
 					var res = JSON.parse(text);
 					var input_str = res.nice_name
-					current_input.innerHTML = "<strong>" + input_str + "</strong>";
+					current_input.innerHTML = "<strong>" + input_str + "</strong>" + " (" + res.active_input + ")";
 				});
 			});
 			fetch(base_url + "/audio").then(function(response) {
@@ -303,8 +332,11 @@
 			fetch(url).then(function(response) {
 				response.text().then(function(text) {
 					var res = JSON.parse(text);
-					stream_status.innerHTML = "Streaming: " + res.streaming + ", scene: " + res.scene;
-					console.log(res.scene)
+					var streaming = res.streaming
+					if (streaming == true) {
+						streaming = "<strong>" + streaming + "</strong>"
+					}
+					stream_status.innerHTML = "Streaming: " + streaming + ", scene: " + res.scene;
 					if (res.scene == "BRB") {
 						is_brb = true;
 					} else {
@@ -381,8 +413,30 @@
 				if (do_switch == true) {
 					switch_scene("back")
 				}
-
 			}
+		}
+		function handle_pause(update) {
+			var pause_button = document.querySelector("#pause");
+			console.log("is_paused: " + is_paused)
+			console.log(pause_button)
+			console.log("update: " + update)
+			if (is_paused == true) {
+				pause_button.className = "btn btn-sm btn-primary"
+				pause_button.innerHTML = "Pause Output"
+				if (update == true) {
+					is_paused = false;
+					msg = postData(base_url + "/outputs/play", {});
+				}
+			}
+			else {
+				pause_button.className = "btn btn-sm btn-success"
+				pause_button.innerHTML = "Play Output"
+				if (update == true) {
+					is_paused = true;
+					postData(base_url + "/outputs/pause", {});
+				}
+			}
+			console.log("is_paused: " + is_paused)
 		}
 		function update_audio_toggle(active) {
 			var audio1_button = document.querySelector("#audio-input1");

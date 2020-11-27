@@ -85,6 +85,10 @@ class Pipeline(object):
         if self.debug:
             self.print_debug(f"Pipeline cleaned up: {self.name}")
 
+    @property
+    def state(self):
+        return self.client.read(f"pipelines/{self.name}/state")['value']
+
     def print_debug(self, msg):
         print(f"[{datetime.now()}] {msg}")
 

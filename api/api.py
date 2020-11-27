@@ -62,10 +62,15 @@ class Outputs(object):
         self.current_bitrate = self.target_bitrate
         self.bitrate_locked = False
 
+    @property
+    def state(self):
+        return self.output_pipeline.state
+
     def as_json(self):
         j = {
             "current_bitrate": self.current_bitrate,
             "bitrate_steps": self.bitrate_steps,
+            "state": self.state,
         }
         return json.dumps(j, ensure_ascii=False)
 
@@ -170,9 +175,19 @@ class SRT(object):
         new_url = urllib.parse.urlunsplit(url_parts)
         return new_url
 
-class Stream(object):
-    def __init__(self, output=''):
-        self.output_string = "srt://srt-ingest:4000"
+class StreamOutput(object):
+    def __init__(self, output_pipeline):
+        self.output_pipeline = output_pipeline
+
+    def on_post_play(self, req, res):
+        self.output_pipeline.play()
+        res.body = json.dumps({"message": "Stream playing."}, ensure_ascii=False)
+        res.status = falcon.HTTP_200
+
+    def on_post_pause(self, req, res):
+        self.output_pipeline.pause()
+        res.body = json.dumps({"message": "Stream paused."}, ensure_ascii=False)
+        res.status = falcon.HTTP_200
 
 
 class StreamControls(object):
