@@ -1,0 +1,18 @@
+[Unit]
+Description=Streaming service daemon (temp name)
+Requires=gstd.service
+After=network.target
+
+
+[Service]
+RuntimeDirectory=gunicorn
+WorkingDirectory=/home/bob/git/livestreaming-stuff/api/
+ExecStartPre=/bin/sh -c "/home/bob/.local/bin/pipenv install --site-packages"
+ExecStart=/bin/sh -c "/home/bob/.local/bin/pipenv run gunicorn --config gunicorn_conf.py app"
+Type=simple
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target

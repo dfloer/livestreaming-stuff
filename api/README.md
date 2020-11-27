@@ -24,3 +24,9 @@ While an eventual goal is to support arbitrary capture devices, the project has 
 - There isn't yes support for non-HDMI audio sources, but adding a microphone in (e.g. a lav or shotgun) is likely to happen.
 - While audio volume can be changed using the API, there isn't anything in the webapp to adjust this (yet, probably).
 - There aren't Ubuntu packages for gst-interpipe and gstd, these will need to be built manually form source.
+
+## Automatic Start
+
+Basic systemd service files for gstd and this server are in the `support/` directory. As well, `gunicorn_conf.py` is to load settings from the config into gunicorn.
+
+The gunicorn systemd service file likely needs a little more work, but does presently work.
