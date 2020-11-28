@@ -245,6 +245,7 @@ class StreamRemoteControl(object):
         self.api_key = self.cfg["api_key"]
         self.ssl_pem = self.cfg["ssl_pem"]
         self.r_session = requests.Session()
+        self.last_status = {"streaming": False, "recording": False, "scene": "<strong>Connection failed.</strong>"}
         if self.ssl_pem:
             self.r_session.verify = self.ssl_pem
         else:
@@ -261,8 +262,12 @@ class StreamRemoteControl(object):
         return res
 
     def get_status(self):
-        res = self.r_get('/status')
-        return json.loads(res.text)
+        try:
+            res = self.r_get('/status')
+            self.last_status = json.loads(res.text)
+        except Exception:
+            pass
+        return self.last_status
 
     def start_stream(self):
         return self.get_res('/start')
@@ -277,10 +282,13 @@ class StreamRemoteControl(object):
         return self.get_res('/back')
 
     def get_res(self, endpoint):
-        r = self.r_post(endpoint)
-        if r.status_code == 200:
-            msg = {"message": "success"}
-        else:
+        try:
+            r = self.r_post(endpoint)
+            if r.status_code == 200:
+                msg = {"message": "success"}
+            else:
+                msg = {"message": "failure"}
+        except Exception:
             msg = {"message": "failure"}
         return json.dumps(msg)
 
