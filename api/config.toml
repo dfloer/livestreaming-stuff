@@ -11,7 +11,7 @@ name = "Cam Link"  # internal name for the input, this needs at least partially 
 nice_name = "Wide Camera"  # display name for the input
 
 [input2]
-gst = "video/x-h264 ! nvv4l2decoder ! nvvidconv ! video/x-raw,format=YUY2 ! timeoverlay text=GC311:"
+gst = "video/x-h264 ! omxh264dec ! nvvidconv ! video/x-raw,format=YUY2 ! timeoverlay text=GC311:"
 name = "Live Gamer"  # internal name for the input, this needs at least partially match the name reported by v4l2-ctl
 nice_name = "Zoom Camera"  # display name for the input
 default = true  # this is the default
