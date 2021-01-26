@@ -221,7 +221,7 @@ class BitrateWatcherThread(threading.Thread):
             elif self.backoff >= 0 and rtt >= self.rtt_backoff_threshold:
                 self.backoff = max(0, min(self.backoff + 1, len(bitrate_steps)))
                 self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
-                if debug:
+                if self.debug:
                     print(f"BitrateWatcher: Drop bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
                 cooldown = self.cooldown_time
             elif self.backoff > 0 and rtt < self.rtt_normal_threshold:
