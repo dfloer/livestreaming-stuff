@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from time import sleep
 from itertools import chain
 import threading
+from datetime import datetime, timedelta
 
 
 def get_config(config_file="srt_config.toml"):
@@ -79,36 +80,52 @@ class OBSControl(threading.Thread):
         self.stabilize_dec = self.thresholds["check_interval"]
         self.obs_websoc = OBSWebsocket(self.obs_cfg)
         self.debug = debug
+        self.last_update = datetime.now()
+        self.ra_samples = self.thresholds["running_avg"]
+        self.update_timeout = timedelta(seconds=self.stabilize_dec * self.ra_samples)
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
         super().__init__(group=None)
 
     def run(self):
-        ra_samples = self.thresholds["running_avg"]
-        rtt_samples = [None for _ in range(ra_samples)]
-        bitrate_samples = [None for _ in range(ra_samples)]
+        rtt_samples = [None for _ in range(self.ra_samples)]
+        bitrate_samples = [None for _ in range(self.ra_samples)]
         stabilize_countdown = 0
         idx = 0
+        healthy = False
         while not self.event.is_set():
             idx += 1
             current_scene = self.obs_websoc.current_scene
             if self.debug:
                 print(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
             stats = self.srt_thread.last_stats
-            if stats == {}:
-                continue
+            timestamp = datetime.now()
+            if stats != {}:
+                rtt_samples[idx % self.ra_samples] = stats["link"]["rtt"]
+                bitrate_samples[idx % self.ra_samples] = stats["send"]["mbitRate"]
+                rtt_ra = sum([x for x in rtt_samples if x is not None]) / self.ra_samples
+                bitrate_ra = sum([x for x in bitrate_samples if x is not None]) / self.ra_samples
+                # pure stats based health determination
+                healthy = rtt_ra <= self.thresholds["rtt"] and bitrate_ra >= self.thresholds["bitrate"]
 
-            rtt_samples[idx % ra_samples] = stats["link"]["rtt"]
-            bitrate_samples[idx % ra_samples] = stats["send"]["mbitRate"]
-            rtt_ra = sum([x for x in rtt_samples if x is not None]) / ra_samples
-            bitrate_ra = sum([x for x in bitrate_samples if x is not None]) / ra_samples
+            # If the source disconnects due to a drop withou explicitly disconnecting, we should go brb.
+            # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
+            last_update_delta = timestamp - self.last_update
+            if last_update_delta >= self.update_timeout:
+                healthy = False
 
-            healthy = rtt_ra <= self.thresholds["rtt"] and bitrate_ra >= self.thresholds["bitrate"]
+            self.last_update = datetime.now()
+            # If the remote disconnects explicitly, go BRB.
+            # To do this we parse the message from the SRT messages.
             if "SRT source disconnected" in self.srt_thread.last_message:
                 healthy = False
-            if self.debug:
+            if self.debug and stats != {}:
                 print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
-                print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}.")
+                print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+            elif self.debug:
+                print(f"No stats. Healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
+                print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+
 
             # If scene has been set manually to BRB, don't switch away from the BRB scene.
             if self.obs_websoc.manual_brb:
