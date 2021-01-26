@@ -1,0 +1,10 @@
+[Unit]
+Description=GStreamer Daemon
+
+[Service]
+ExecStart=/usr/local/bin/gstd
+Type=simple
+ExecStop=/bin/kill -1 $MAINPID
+
+[Install]
+WantedBy=multi-user.target

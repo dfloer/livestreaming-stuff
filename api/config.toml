@@ -1,0 +1,34 @@
+[encoder]
+preferred_bitrate = 4500000  # bits/second. What is our nominal bitrate? bits/second
+fallback_bitrates = [ 4500000, 3000000, 1500000,]  # bits/second. What bitrates do we fallback too?
+gst = "nvv4l2h265enc iframeinterval=120 insert-vui=1 insert-aud=1 insert-sps-pps=1 control-rate=1 preset-level=4 maxperf-enable=true EnableTwopassCBR=true"  # gstreamer pipeline
+name = "HEVC"  # internal name of the encoder of the encoder
+nice_name = "HEVC"  # name of the encoder for display.
+
+[input1]
+gst = "timeoverlay text=Camlink4k:"  # gst for input 1
+name = "Cam Link"  # internal name for the input, this needs at least partially match the name reported by v4l2-ctl
+nice_name = "Wide Camera"  # display name for the input
+
+[input2]
+gst = "video/x-h264 ! omxh264dec ! nvvidconv ! video/x-raw,format=YUY2 ! timeoverlay text=GC311:"
+name = "Live Gamer"  # internal name for the input, this needs at least partially match the name reported by v4l2-ctl
+nice_name = "Zoom Camera"  # display name for the input
+default = true  # this is the default
+
+[output1]
+name = "SRT Output"  # internal name for the output
+nice_name = "SRT Ingest Server"  # display name for the output
+url = "srt://srt-ingest:4000"  # url for the SRT server to connect to.
+api_url = "https://srt-ingest:4443"  # url for the OBS control API server.
+api_key = ""  # Api key for the remote control API goes here. If this is blank, the API won't work.
+ssl_pem = 'ssl/ssl.pem'  # This is for self-signed certificates, and needs to be in pem bundle format. If you aren't using one, (like a CA signed one, like form Let's Encrypt), leave this blank, and it should use that cert.
+backoff_rtt = 110  # If RTT goes higher than this, we should back the bitrate off.
+backoff_rtt_normal = 90  # RTT needs to go below this level to be considered normal.
+backoff_retry_time = 5  # Wait this many seconds before we try to change the bitrate again.
+srt_passphrase = ''  # Encryption passphrase to use with SRT. This is required, and must be the exact same as on the server.
+
+[api_server]
+address = "0.0.0.0"  # Address to listen to connections from.
+port = 8000  # port to serve the API/webapp from.
+debug = false  # true to print debug messages, false otherwise.

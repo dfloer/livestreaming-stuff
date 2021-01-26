@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Streaming Control</title>
+
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+
+  </head>
+  <body>
+
+    <div class="container-fluid">
+	<div class="row">
+		<div class="col-md-12">
+
+		</div>
+	</div>
+	<div class="row">
+		<div class="col-md-7">
+			<table class="table table-sm" load="update_table()">
+				<thead>
+					<tr>
+						<th>
+							&nbsp;
+						</th>
+						<th>
+							&nbsp;
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr class="table-success">
+						<td>
+							Current Input:
+						</td>
+						<td id="current_input">
+							<strong>loading input...</strong>
+						</td>
+					</tr>
+					<tr class="table-active">
+						<td>
+							Output Info:
+						</td>
+						<td id="current_bitrate">
+							<strong>loading bitrate/state...</strong>
+						</td>
+					</tr>
+					<tr>
+						<td>
+							SRT Stats:
+						</td>
+						<td id="srt_stats">
+							loading srt stats...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							SRT output server:
+						</td>
+						<td id="srt_output">
+							loading output...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Bitrate Steps:
+						</td>
+						<td id="bitrate_steps">
+							loading bitrate steps...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Audio:
+						</td>
+						<td id="audio_status">
+							loading audio status...
+						</td>
+					</tr>
+					<tr>
+						<td>
+							Stream Status:
+						</td>
+						<td id="stream_status">
+							loading stream status...
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<div class="col-md-1">
+		</div>
+		<div class="col-md-4">
+			<button type="button" onclick="button_click(this)" class="btn btn-success btn-lg btn-block" name="switch" id="switch">
+				Switch Input
+			</button>
+			<button type="button"  onclick="button_click(this)" class="btn btn-lg btn-block btn-info" name="go_live" id="go_live">
+				Go Live!
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="refresh" id="refresh">
+				Refresh
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="status">
+				Status
+			</button>
+			<button type="button" onclick="button_click(this)" class="btn btn-success btn-md" name="mute" id="mute">
+				Mute Audio
+			</button>
+			<div class="btn-group" role="group">
+				<button class="btn btn-primary" onclick="button_click(this)" type="button" id="audio-input1">
+					Input 1
+				</button>
+				<button class="btn btn-secondary" onclick="button_click(this)" type="button" id="audio-input2">
+					Input 2
+				</button>
+			</div>
+			<div id="card-1">
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link" data-toggle="collapse" data-parent="#card-1" href="#card-element-1">Bitrate Controls</a>
+					</div>
+					<div id="card-element-1" class="collapse">
+						<div class="card-body">
+							<button type="button" onclick="button_click(this)" class="btn btn-sm btn-warning" name="reset_bitrate" id="reset_bitrate">
+								Reset Bitrate
+							</button>
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="bitrate_up" id="bitrate_up">
+								Bitrate Up
+							</button>
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="bitrate_down" id="bitrate_down">
+								Bitrate Down
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link collapsed" data-toggle="collapse" data-parent="#card-1" href="#card-element-3">Scenes</a>
+					</div>
+					<div id="card-element-3" class="collapse">
+						<div class="card-body">
+							<button type="button" onclick="button_click(this)" class="btn btn-secondary btn-sm" name="brb" id="brb">
+								Live Scene
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link collapsed" data-toggle="collapse" data-parent="#card-1" href="#card-element-2">Danger Zone</a>
+					</div>
+					<div id="card-element-2" class="collapse">
+						<div class="card-body">
+							<button type="button" onclick="button_click(this)" class="btn btn-danger btn-sm" name="stop" id="stop">
+								Stop
+							</button>
+						</div>
+					</div>
+				</div>
+				<div class="card">
+					<div class="card-header">
+						 <a class="card-link collapsed" data-toggle="collapse" data-parent="#card-1" href="#card-element-4">Pause/Play</a>
+					</div>
+					<div id="card-element-4" class="collapse">
+						<div class="card-body">
+							<div class="btn-group" role="group">
+								<button type="button" onclick="button_click(this)" class="btn btn-sm btn-success" name="pause" id="pause">
+									Play Output
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+	<script src="js/scripts.js"></script>
+	<script>
+		var base_url = window.location.origin;
+		var refresh_stats = true;
+		var is_brb = false;
+		var muted = false;
+		var is_paused = false;
+		update_table();
+		update_stream_status();
+		handle_pause(false);
+		var update_interval = setInterval(update_table, 1000);
+		function button_click(elem) {
+			console.log(elem.id);
+			if (elem.id == "refresh") {
+				update_table();
+			}
+			if (elem.id == "switch") {
+				switch_input();
+				update_table();
+			}
+			if (elem.id == "go_live") {
+				start_stream();
+				update_table();
+			}
+			if (elem.id == "stop") {
+				stop_stream();
+				update_table();
+			}
+			if (elem.id == "bitrate_up") {
+				change_bitrate("inc");
+				update_table();
+			}
+			if (elem.id == "bitrate_down") {
+				change_bitrate("dec");
+				update_table();
+			}
+			if (elem.id == "reset_bitrate") {
+				change_bitrate("res");
+				update_table();
+			}
+			if (elem.id == "status") {
+				update_stream_status();
+			}
+			if (elem.id == "mute") {
+				toggle_audio();
+				update_table();
+				var refresh_button = document.querySelector("#mute");
+				if(muted == false) {
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-success(?!\S)/g , '' );
+					refresh_button.className += " btn-danger";
+					muted = true;
+					refresh_button.innerHTML = "UnMute Audio"
+				}
+				else {
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-danger(?!\S)/g , '' );
+					refresh_button.className += " btn-success";
+					muted = false;
+					refresh_button.innerHTML = "Mute Audio"
+				}
+			}
+			if (elem.id == "audio-input1") {
+				audio_input("input1");
+			}
+			if (elem.id == "audio-input2") {
+				audio_input("input2");
+			}
+			if (elem.id == "refresh") {
+				var refresh_button = document.querySelector("#refresh");
+				if(refresh_stats == true) {
+					refresh_stats = false;
+					clearInterval(update_interval);
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+					refresh_button.className += " btn-secondary";
+				}
+				else {
+					update_interval = setInterval(update_table, 1000);
+					refresh_stats = true;
+					refresh_button.className = refresh_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+					refresh_button.className += " btn-primary";
+				}
+			}
+			if (elem.id == "pause") {
+				handle_pause(true);
+			}
+			if (elem.id == "brb") {
+				handle_scene(true);
+			}
+		}
+		function update_table() {
+			var srt_stats = document.querySelector("#srt_stats");
+			var srt_output = document.querySelector("#srt_output");
+			var bitrate_steps = document.querySelector("#bitrate_steps");
+			var current_bitrate = document.querySelector("#current_bitrate");
+			var current_input = document.querySelector("#current_input");
+			var audio = document.querySelector("#audio_status");
+
+			fetch(base_url + "/srt-stats").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var stats_str = "bitrate: " + res.stats.bitrate.toFixed(2) + "Mb/s, flight: " + res.stats.flight + ", flow: " + res.stats.flow + ", rtt: " + res.stats.rtt.toFixed(2) + ", dropped: " + res.stats.send_dropped;
+					srt_stats.textContent = stats_str;
+					srt_output.textContent = res.output;
+				});
+			});
+			fetch(base_url + "/outputs").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var bitrate_str = res.current_bitrate / 1000000 + " Mb/s";
+					var steps_str = res.bitrate_steps;
+					console.log(res.state)
+					if (res.state != "PLAYING") {
+						is_paused = true;
+					} else {
+						is_paused = false;
+					}
+					var paused = is_paused
+					if (is_paused == true) {
+						paused = "<strong>" + is_paused + "</strong>"
+					}
+					current_bitrate.innerHTML = "<strong>" + bitrate_str + "</strong>" + "&nbsp;&nbsp;&nbsp;&nbsp;paused: " + paused;
+					var nice_steps = steps_str.map(x => x / 1000000 + "Mb/s");
+					bitrate_steps.textContent = nice_steps.join(", ");
+				});
+			});
+			fetch(base_url + "/inputs").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var input_str = res.nice_name
+					current_input.innerHTML = "<strong>" + input_str + "</strong>" + " (" + res.active_input + ")";
+				});
+			});
+			fetch(base_url + "/audio").then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var input_str = res.nice_name;
+					var mute_status = res.muted;
+					if (mute_status == true) {
+						mute_status = "<strong>" + mute_status + "</strong>"
+					}
+					audio.innerHTML = "Input: " + res.active + ", muted: " + mute_status;
+					update_audio_toggle(res.active);
+				});
+			});
+		}
+		function update_stream_status() {
+			var url = base_url + "/stream/status";
+			var stream_status = document.querySelector("#stream_status");
+			fetch(url).then(function(response) {
+				response.text().then(function(text) {
+					var res = JSON.parse(text);
+					var streaming = res.streaming
+					if (streaming == true) {
+						streaming = "<strong>" + streaming + "</strong>"
+					}
+					stream_status.innerHTML = "Streaming: " + streaming + ", scene: " + res.scene;
+					if (res.scene == "BRB") {
+						is_brb = true;
+					} else {
+						is_brb = false;
+					}
+					handle_scene(false);
+				});
+			});
+		}
+		async function postData(url = '', data = {}){
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+      				'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(data),
+			});
+			return response;
+		}
+		function switch_input() {
+			var url = base_url + "/inputs/swap";
+			postData(url, {});
+		}
+		function start_stream() {
+			var url = base_url + "/stream/start";
+			postData(url, {});
+			update_stream_status();
+		}
+		function stop_stream() {
+			var url = base_url + "/stream/stop";
+			postData(url, {});
+			update_stream_status();
+		}
+		function toggle_audio() {
+			var url = base_url + "/audio/mute";
+			var pd = postData(url, {});
+		}
+		function audio_input(input_name) {
+			var url = base_url + "/audio/" + input_name;
+			var pd = postData(url, {});
+		}
+		function switch_scene(scene) {
+			var url = base_url + "/stream/" + scene;
+			var pd = postData(url, {});
+		}
+		function change_bitrate(dir) {
+			var url = base_url + "/outputs/encoder";
+			if(dir == "inc") {
+				url += "/inc"
+			}
+			else if(dir == "dec") {
+				url += "/dec"
+			}
+			else {
+				url += "/reset"
+			}
+			postData(url, {});
+		}
+		function handle_scene(do_switch) {
+			var brb_button = document.querySelector("#brb");
+			if(is_brb == true) {
+				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				brb_button.className += " btn-secondary";
+				brb_button.innerHTML = "Live Scene";
+				is_brb = false;
+				if (do_switch == true) {
+					switch_scene("brb")
+				}
+			} else {
+				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				brb_button.className += " btn-primary";
+				brb_button.innerHTML = "BRB scene";
+				is_brb = true;
+				if (do_switch == true) {
+					switch_scene("back")
+				}
+			}
+		}
+		function handle_pause(update) {
+			var pause_button = document.querySelector("#pause");
+			console.log("is_paused: " + is_paused)
+			console.log(pause_button)
+			console.log("update: " + update)
+			if (is_paused == true) {
+				pause_button.className = "btn btn-sm btn-primary"
+				pause_button.innerHTML = "Pause Output"
+				if (update == true) {
+					is_paused = false;
+					msg = postData(base_url + "/outputs/play", {});
+				}
+			}
+			else {
+				pause_button.className = "btn btn-sm btn-success"
+				pause_button.innerHTML = "Play Output"
+				if (update == true) {
+					is_paused = true;
+					postData(base_url + "/outputs/pause", {});
+				}
+			}
+			console.log("is_paused: " + is_paused)
+		}
+		function update_audio_toggle(active) {
+			var audio1_button = document.querySelector("#audio-input1");
+			var audio2_button = document.querySelector("#audio-input2");
+			if(active == "input1-audio") {
+				audio2_button.className = audio2_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				audio2_button.className += " btn-secondary";
+				audio1_button.className = audio1_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				audio1_button.className += " btn-primary";
+			} else {
+				audio1_button.className = audio1_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				audio1_button.className += " btn-secondary";
+				audio2_button.className = audio2_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				audio2_button.className += " btn-primary";
+			}
+		}
+	</script>
+
+  </body>
+</html>
