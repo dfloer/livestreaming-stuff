@@ -1,4 +1,4 @@
-from srt_stats import SRTThread
+from srt_stats import SRTThread, SRTLAThread
 import toml
 from obswebsocket import obsws, requests
 from dataclasses import dataclass
@@ -150,10 +150,26 @@ class OBSControl(threading.Thread):
 def start_srt(config):
     srt_cfg = config["srt_relay"]
     srt_passphrase = srt_cfg["encryption_passphrase"]
-    srt_thread = SRTThread(f"srt://:{srt_cfg['output_port']}", f"srt://:{srt_cfg['listen_port']}", passphrase=srt_passphrase)
+    srt_thread = SRTThread(
+        srt_destination=f"srt://:{srt_cfg['output_port']}",
+        srt_source=f"srt://localhost:4001",
+        passphrase=srt_passphrase,
+        srt_live_transmit=srt_cfg['srtla_slt_path'])
     srt_thread.daemon = True
     srt_thread.start()
     return srt_thread
+
+def start_srtla(config):
+    srtla_cfg = config["srt_relay"]
+    srtla_thread = SRTLAThread(
+        srtla_cfg['srtla_rec_path'],
+        srtla_cfg['listen_port'],
+        "localhost",
+        4001)
+    srtla_thread.daemon = True
+    srtla_thread.start()
+    return srtla_thread
+
 
 if __name__ == "__main__":
     config = get_config()

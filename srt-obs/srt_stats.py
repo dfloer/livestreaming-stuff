@@ -7,7 +7,7 @@ import secrets
 
 
 class SRTThread(threading.Thread):
-    def __init__(self, srt_destination, srt_source="udp://:4200", stats_interval=100, update_interval=0.1, passphrase=''):
+    def __init__(self, srt_destination, srt_source="udp://:4200", stats_interval=100, update_interval=0.1, passphrase='', srt_live_transmit="srt-live-transmit"):
         """
         Wrapper thread to start/stop srt-live-transmit and get stats out of it.
         Source and destination as per documentation at: https://github.com/Haivision/srt/blob/master/docs/srt-live-transmit.md
@@ -18,10 +18,12 @@ class SRTThread(threading.Thread):
             stats_interval (int, optional): How often to update the SRT stats, in _packets_, not time. Defaults to 100.
             update_interval (float, optional): How often to should read stats from the process, too often and it blocks the web thread, not often enough and output from the process gets blocked.. Defaults to 0.1.
             passphrase (str, optional): Passphrase to use for encryption. If this is blank, one will be generated and printed on the console.
+            srt_live_transmit (Path, optional): Path to the srt-live-transmit binary. If none specified, will use whatever one is in your path. Defaults to "srt-live-transmit".
         """
         self.event = threading.Event()
         self.stats_interval = stats_interval
         self.update_interval = update_interval
+        self.srt_exec = srt_live_transmit
 
         self.passphrase = passphrase
         print("passphrase:", self.passphrase)
@@ -33,7 +35,7 @@ class SRTThread(threading.Thread):
         print(f"{self.passphrase}")
         print(div)
 
-        self.src_conn = f"{srt_source}?passphrase={self.passphrase}&enforcedencryption=true"
+        self.src_conn = f"{srt_source}?passphrase={self.passphrase}&enforcedencryption=true&mode=listener&lossmaxttl=50&latency=200"
         self.dst_conn = srt_destination
         self.srt_process = self.start_process()
         set_blocking(self.srt_process.stdout.fileno(), False)
@@ -61,14 +63,15 @@ class SRTThread(threading.Thread):
                 self.last_stats = stats[-1]
             if msg:
                 self.last_message = msg[-1]
-                print(f"Message: {msg}")
+                print(f"SRT Message: {msg}")
             self.event.wait(self.update_interval)
 
     def start_process(self):
         """
         Start the SRT process.
         """
-        srt_cmd = f"srt-live-transmit -srctime -buffering 1 -s {self.stats_interval} -pf json \"{self.src_conn}\" {self.dst_conn}"
+        srt_cmd = f"{self.srt_exec} -srctime -buffering 1 -s {self.stats_interval} -pf json \"{self.src_conn}\" {self.dst_conn}"
+        print("starting srt:", srt_cmd)
         return subprocess.Popen(
             f"{srt_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -118,3 +121,50 @@ class SRTThread(threading.Thread):
         """
         self.kill_process()
         self.event.set()
+
+class SRTLAThread(threading.Thread):
+    def __init__(self, srtla_rec="srtla_rec", source_port=4000, destination_host="localhost", destination_port=4001):
+        self.event = threading.Event()
+        self.src_port = source_port
+        self.dst_port = destination_port
+        self.srtla_exec = srtla_rec
+        self.host = destination_host
+        self.event = threading.Event()
+        self.srtla_process = self.start_process()
+        set_blocking(self.srtla_process.stdout.fileno(), False)
+        super().__init__(group=None)
+        # print("srtla:", self.srtla_process.stdout.read())
+
+    def start_process(self):
+        """
+        Start the SRTla process.
+        """
+        srtla_cmd = f"{self.srtla_exec} {self.src_port} {self.host} {self.dst_port}"
+        print(f"starting srtla: {srtla_cmd}")
+        return subprocess.Popen(
+            f"{srtla_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
+
+    def kill_process(self):
+        """
+        Start the SRT process.
+        """
+        self.srtla_process.kill()
+
+    def stop(self):
+        """
+        Stops the srt-live-transmit process and the stats-gathering loop.
+        """
+        self.kill_process()
+        self.event.set()
+
+    def run(self):
+        """
+        Get the stats and save the last one to this object.
+        """
+        print("SRTLA thread running.")
+        while not self.event.is_set():
+            msg = self.srtla_process.stdout.read()
+            if msg:
+                print(f"SRTLA Message: {msg.decode('ASCII')}")
+            self.event.wait(0.1)
