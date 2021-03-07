@@ -175,6 +175,26 @@ class SRT(object):
         new_url = urllib.parse.urlunsplit(url_parts)
         return new_url
 
+class SRTLA(object):
+    def __init__(self, srtla):
+        self.srtla_output = srtla
+        self.ip_addrs = self.get_ips()
+
+    def get_ips(self):
+        with open(self.srtla_output.ip_file, 'r') as f:
+            raw = f.readlines()
+        print(raw)
+        return [str(x.strip()) for x in raw]
+
+
+    def on_get(self, req, res):
+        doc = {
+            "ip_list": self.ip_addrs
+        }
+        res.body = json.dumps(doc, ensure_ascii=False)
+        res.status = falcon.HTTP_200
+
+
 class StreamOutput(object):
     def __init__(self, output_pipeline):
         self.output_pipeline = output_pipeline

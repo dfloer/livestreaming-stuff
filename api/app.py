@@ -1,7 +1,8 @@
 import falcon
 import json
+import re
 from os import path, getcwd
-from api import SRT
+from api import SRT, SRTLA
 from api import Inputs
 from api import Outputs
 from api import StreamControls
@@ -9,7 +10,8 @@ from api import AudioControls
 from api import StreamOutput
 from time import sleep
 
-from srt_stats import SRTThread
+from srt_stats import SRTThread, SRTLAThread
+from helpers import srtla_ip_setup
 import control
 
 
@@ -30,11 +32,21 @@ api = application = falcon.API()
 
 pipelines, pipelines_meta, srt_passphrase = control.setup()
 
-srt_watcher_thread = SRTThread(passphrase=srt_passphrase, srt_destination=pipelines["output1"].url)
+srt_watcher_thread = SRTThread(passphrase=srt_passphrase, srt_destination="srt://localhost:6000?mode=caller")
 srt_watcher_thread.daemon = True
 srt_watcher_thread.start()
 
+srt_protocol, srt_hostname, srt_port = re.split('://|:', pipelines["output1"].url)
+
+srtla_ips_path = srtla_ip_setup()
+print("srtla ips:", srtla_ips_path)
+
+srtla_thread = SRTLAThread(srtla_send="/home/bob/git/srtla/srtla_send", destination_host=srt_hostname, destination_port=srt_port, ip_file=srtla_ips_path)
+srtla_thread.daemon = True
+srtla_thread.start()
+
 srt_stats = SRT(srt=srt_watcher_thread)
+srtla_stats = SRTLA(srtla=srtla_thread)
 input_status = Inputs(pipelines["input1"], pipelines["input2"], pipelines["output1"])
 output_status = Outputs(pipelines["output1"])
 remote_controls = control.StreamRemoteControl()
@@ -48,6 +60,7 @@ bitrate_watcher_thread.start()
 
 api.add_static_route("/static", path.join(getcwd(), "frontend"), fallback_filename='index.html')
 api.add_route("/srt-stats", srt_stats)
+api.add_route("/srtla-stats", srtla_stats)
 api.add_route("/inputs/{input_name}", input_status)
 api.add_route("/inputs", input_status)
 api.add_route("/outputs/play", output_controls, suffix="play")

@@ -64,8 +64,9 @@ def parse_url(url):
     Returns:
         (tuple): (protocol, hostname, port)
     """
-    protocol, hostname, port = re.split('://|:', url)
-    return protocol.lower(), hostname, int(port)
+    # protocol, hostname, port = re.split('://|:', url)
+    # return protocol.lower(), hostname, int(port)
+    pass
 
 
 def create_pipelines(client, config, debug=False):
@@ -139,7 +140,7 @@ def create_pipelines(client, config, debug=False):
     # This is messy and should probably be handled elsewhere.
     # But the name of the encoder sometimes changes if gstd isn't restarted between invocations of this program.
     # So we find the current name. The number at the end is what changes.
-    protocol, hostname, port = parse_url(output_config['url'])
+    # protocol, hostname, port = parse_url(output_config['url'])
     output1_sink = f"h265parse ! mux. mpegtsmux name=mux ! rndbuffersize max=1316 min=1316 ! udpsink host=localhost port=4200"
     encoder_input = f"nvvidconv ! textoverlay text=bitrate: ! nvvidconv "
     output1_gst = f"{output1_inter} ! {encoder_input} ! {encoder_config['gst']} ! {output1_sink} {output1_audio_inter}"
