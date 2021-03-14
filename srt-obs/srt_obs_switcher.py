@@ -80,9 +80,9 @@ class OBSControl(threading.Thread):
         self.stabilize_dec = self.thresholds["check_interval"]
         self.obs_websoc = OBSWebsocket(self.obs_cfg)
         self.debug = debug
-        self.last_update = datetime.now()
         self.ra_samples = self.thresholds["running_avg"]
-        self.update_timeout = timedelta(seconds=self.stabilize_dec * self.ra_samples)
+        #  5 added because it seemed too short otherwise. This seems like a hack...
+        self.update_timeout = timedelta(seconds=self.stabilize_dec * self.ra_samples * 5)
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
         super().__init__(group=None)
@@ -110,11 +110,12 @@ class OBSControl(threading.Thread):
 
             # If the source disconnects due to a drop withou explicitly disconnecting, we should go brb.
             # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
-            last_update_delta = timestamp - self.last_update
+            last_update_delta = timestamp - self.srt_thread.last_update
             if last_update_delta >= self.update_timeout:
+                if self.debug:
+                    print(f"Stats have not been updated for: {last_update_delta}, which is longer than cutoff: {self.update_timeout}.")
                 healthy = False
 
-            self.last_update = datetime.now()
             # If the remote disconnects explicitly, go BRB.
             # To do this we parse the message from the SRT messages.
             if "SRT source disconnected" in self.srt_thread.last_message:

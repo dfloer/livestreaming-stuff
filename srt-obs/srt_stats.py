@@ -4,6 +4,7 @@ import select
 import json
 from os import set_blocking
 import secrets
+from datetime import datetime
 
 
 class SRTThread(threading.Thread):
@@ -24,6 +25,7 @@ class SRTThread(threading.Thread):
         self.stats_interval = stats_interval
         self.update_interval = update_interval
         self.srt_exec = srt_live_transmit
+        self.last_update = datetime.now()
 
         self.passphrase = passphrase
         print("passphrase:", self.passphrase)
@@ -61,6 +63,7 @@ class SRTThread(threading.Thread):
             stats, msg = self.stats_parse()
             if stats:
                 self.last_stats = stats[-1]
+                self.last_update = datetime.now()
             if msg:
                 self.last_message = msg[-1]
                 print(f"SRT Message: {msg}")
