@@ -3,6 +3,12 @@ listen_port = 4000  # port for the SRT relay to listen on
 output_port = 9000  # port for the SRT relaythat OBS connects to
 encryption_passphrase = ''  # SRT passphrase for encryption. If this is blank, one will be generated and printed in the console. This exact same key needs to be on the Nano as well.
 
+srtla_internal_port = 0  # Optional internal port to use. By not setting this, port 4001 is used by default.
+srtla_rec_path = 'srtla_rec'  # Optional path to srtla_rec binary. If not set, it needs to be in your PATH.
+srtla_slt_path = 'srt-live-transmit'  # Optional path to the patched srt-live-transmit that srtla needs to work. If not set, assumes that the system one is patched.
+    # Note that no checking is presently done to make sure the previous exist. Make sure that they do!
+use_srtla = true  # Whether or not to use srtla. Currently forced to being on.
+
 [obs]
 websocket_host = "obs-host"  # hostname of the computer running obs/obs-websocket
 websocket_port = 4444  # port to connect to obs-websocket on
