@@ -29,7 +29,6 @@ class StaticResource(object):
 
 api = application = falcon.API()
 
-
 pipelines, pipelines_meta, srt_passphrase = control.setup()
 
 srt_watcher_thread = SRTThread(passphrase=srt_passphrase, srt_destination="srt://localhost:6000?mode=caller")
@@ -38,8 +37,11 @@ srt_watcher_thread.start()
 
 srt_protocol, srt_hostname, srt_port = re.split('://|:', pipelines["output1"].url)
 
-srtla_ips_path = srtla_ip_setup()
+srtla_ips_path, srtla_ip_addrs = srtla_ip_setup()
 print("srtla ips:", srtla_ips_path)
+
+control.setup_source_routing(srtla_ip_addrs.keys(), debug=True)
+control.set_clocks(debug=True)
 
 srtla_thread = SRTLAThread(srtla_send="/home/bob/git/srtla/srtla_send", destination_host=srt_hostname, destination_port=srt_port, ip_file=srtla_ips_path)
 srtla_thread.daemon = True

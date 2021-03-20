@@ -1,7 +1,7 @@
 [encoder]
 preferred_bitrate = 4500000  # bits/second. What is our nominal bitrate? bits/second
 fallback_bitrates = [ 4500000, 3000000, 1500000,]  # bits/second. What bitrates do we fallback too?
-gst = "nvv4l2h265enc iframeinterval=120 insert-vui=1 insert-aud=1 insert-sps-pps=1 control-rate=1 preset-level=4 maxperf-enable=true EnableTwopassCBR=true"  # gstreamer pipeline
+gst = "nvv4l2h265enc iframeinterval=120 insert-vui=1 insert-aud=1 insert-sps-pps=1 control-rate=1 preset-level=4 maxperf-enable=true EnableTwopassCBR=true  qp-range=\"28,50:0,38:0,50\""  # gstreamer pipeline
 name = "HEVC"  # internal name of the encoder of the encoder
 nice_name = "HEVC"  # name of the encoder for display.
 
@@ -27,6 +27,17 @@ backoff_rtt = 110  # If RTT goes higher than this, we should back the bitrate of
 backoff_rtt_normal = 90  # RTT needs to go below this level to be considered normal.
 backoff_retry_time = 5  # Wait this many seconds before we try to change the bitrate again.
 srt_passphrase = ''  # Encryption passphrase to use with SRT. This is required, and must be the exact same as on the server.
+
+[srtla_config]
+srtla_internal_port = 0  # Optional internal port to use. By not setting this, port 4001 is used by default.
+srtla_path = ''  # Optional path to srtla_send binary. If not set, it needs to be in your PATH.
+srtla_ip_path = ''  # Optional path to the srtla ip address file.
+                    # If not given, this app will attempt to determine the IP addresses and write them to a file in the app directory.
+                    # This is useful if one doesn't know the IP addresses of the devices, but the app could guess wrong.
+srtla_devices = ["wlan0", "usb0", "usb1", "eth0"]  # Optional devices to bind to. This would be like ["eht0", "wlan0", "usb0"]
+                    # If this and srtla_ip_path are empty, then the app will do it's best guess with interfaces with IP addresses.
+srtla_ipv6 = false  # Currently it looks like SRTLA doesn't use IPv6, so setting this to true does nothing.
+use_srtla = true  # Whether or not to use srtla. Currently forced to being on.
 
 [api_server]
 address = "0.0.0.0"  # Address to listen to connections from.
