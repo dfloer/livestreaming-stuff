@@ -64,8 +64,9 @@ def parse_url(url):
     Returns:
         (tuple): (protocol, hostname, port)
     """
-    protocol, hostname, port = re.split('://|:', url)
-    return protocol.lower(), hostname, int(port)
+    # protocol, hostname, port = re.split('://|:', url)
+    # return protocol.lower(), hostname, int(port)
+    pass
 
 
 def create_pipelines(client, config, debug=False):
@@ -139,7 +140,7 @@ def create_pipelines(client, config, debug=False):
     # This is messy and should probably be handled elsewhere.
     # But the name of the encoder sometimes changes if gstd isn't restarted between invocations of this program.
     # So we find the current name. The number at the end is what changes.
-    protocol, hostname, port = parse_url(output_config['url'])
+    # protocol, hostname, port = parse_url(output_config['url'])
     output1_sink = f"h265parse ! mux. mpegtsmux name=mux ! rndbuffersize max=1316 min=1316 ! udpsink host=localhost port=4200"
     encoder_input = f"nvvidconv ! textoverlay text=bitrate: ! nvvidconv "
     output1_gst = f"{output1_inter} ! {encoder_input} ! {encoder_config['gst']} ! {output1_sink} {output1_audio_inter}"
@@ -219,14 +220,16 @@ class BitrateWatcherThread(threading.Thread):
                 # If the bitrate is manually locked, don't switch, even if we otherwise would be.
                 pass
             elif self.backoff >= 0 and rtt >= self.rtt_backoff_threshold:
-                self.backoff = max(0, min(self.backoff + 1, len(bitrate_steps)))
+                self.backoff = max(0, min(self.backoff + 1, len(bitrate_steps) - 1))
                 self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
+                self.output_pipe.output_pipeline.set_bitrate(bitrate_steps[self.backoff])
                 if self.debug:
                     print(f"BitrateWatcher: Drop bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
                 cooldown = self.cooldown_time
             elif self.backoff > 0 and rtt < self.rtt_normal_threshold:
-                self.backoff = max(0, min(self.backoff - 1, len(bitrate_steps)))
+                self.backoff = max(0, min(self.backoff - 1, len(bitrate_steps) - 1))
                 self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
+                self.output_pipe.output_pipeline.set_bitrate(bitrate_steps[self.backoff])
                 if self.debug:
                     print(f"BitrateWatcher: Increase bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
                 cooldown = self.cooldown_time
@@ -254,19 +257,19 @@ class StreamRemoteControl(object):
 
     # ToDo: This is all likely going to need a short timeout, or be async.
     def r_get(self, endpoint='/'):
-        res = self.r_session.get(self.url + endpoint)
+        res = self.r_session.get(self.url + endpoint, verify=False)
         return res
 
     def r_post(self, endpoint='/', data={}):
-        res = self.r_session.post(self.url + endpoint, data=data)
+        res = self.r_session.post(self.url + endpoint, data=data, verify=False)
         return res
 
     def get_status(self):
         try:
             res = self.r_get('/status')
             self.last_status = json.loads(res.text)
-        except Exception:
-            pass
+        except Exception as e:
+            print(e)
         return self.last_status
 
     def start_stream(self):
@@ -291,6 +294,34 @@ class StreamRemoteControl(object):
         except Exception:
             msg = {"message": "failure"}
         return json.dumps(msg)
+
+
+def setup_source_routing(interfaces, debug=False):
+    """
+    This is needed to set up source routing for SRTLA.
+    Args:
+        interfaces (list): list of network interfaces to set up.
+        debug (bool, optional): Whether or not to print debug info. Defaults to False.
+    """
+    for iface in interfaces:
+        if iface == "eth0":
+            continue
+        cmd = f"sudo ./if-post-up-source-route.sh {iface}"
+        res = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        if debug:
+            print(res)
+
+def set_clocks(debug=False):
+    """
+    Runs jetson_clocks with no arguments to set the Jetson Nano to the maximum clock speeds.
+    This is needed because otherwise the audio can get choppy when the cpu throttles.
+    Args:
+        debug (bool, optional): Whether or not to print debug info. Defaults to False.
+    """
+    res = subprocess.Popen("sudo jetson_clocks", stdout=subprocess.PIPE, shell=True)
+    if debug:
+        print(res)
+
 
 if __name__ == "__main__":
     # This is a test to swap between inputs and change the bitrate to ensure everything is working correctly.
