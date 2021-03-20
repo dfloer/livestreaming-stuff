@@ -109,6 +109,7 @@ class KeyMiddleware(object):
 
 config = srtos.get_config()
 srt_thread = srtos.start_srt(config)
+srtla_thread = srtos.start_srtla(config)
 debug = False
 
 obs_ctrl = srtos.OBSControl(srt_thread=srt_thread, debug=debug)
