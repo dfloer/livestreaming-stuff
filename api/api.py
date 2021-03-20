@@ -14,7 +14,7 @@ class Inputs(object):
     def as_json(self):
         which = self.active_input
         nice_name = self.input1_pipeline.nice_name if which == self.input1_pipeline.name else self.input2_pipeline.nice_name
-        j = {"active_input": which, "nice_name": nice_name}
+        j = {"active_input": which, "nice_name": nice_name, "total_inputs": 2}
         return json.dumps(j, ensure_ascii=False)
 
     def swap_inputs(self):
@@ -246,18 +246,18 @@ class AudioControls(object):
 
     def on_get(self, req, res):
         active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
-        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute}, ensure_ascii=False)
+        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
     def on_post_mute(self, req, res):
         self.output_pipe.toggle_audio_mute()
         active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
-        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute}, ensure_ascii=False)
+        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
     def on_post_name(self, req, res, input_name):
         print(f"Switch to input {input_name}.")
         self.output_pipe.switch_audio_src(input_name)
         active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
-        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute}, ensure_ascii=False)
+        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
         res.status = falcon.HTTP_200
