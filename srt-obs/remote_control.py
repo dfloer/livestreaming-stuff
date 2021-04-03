@@ -5,6 +5,7 @@ from time import sleep
 import srt_obs_switcher as srtos
 import secrets
 from datetime import datetime
+import logging
 
 
 class StreamControls(object):
@@ -18,6 +19,7 @@ class StreamControls(object):
         self.obs_websoc = obs_ctrl.obs_websoc
         self.time_str = "%Y-%m-%dT%H:%M:%S.%fZ"
         if not self.api_key:
+            logging.debug("Generated API key.")
             self.generate_key()
         div = "--------------------------------------------"
         print(f"\nAPI Key:")
@@ -35,6 +37,7 @@ class StreamControls(object):
     def on_get_heartbeat(self, req, res):
         self.last_hearbeat = datetime.now()
         j = {"heartbeat": self.nice_hearbeat()}
+        logging.debug("Control: heartbeat")
         res.body = json.dumps(j)
         res.status = falcon.HTTP_200
 
@@ -42,58 +45,63 @@ class StreamControls(object):
         status = self.obs_websoc.stream_status()
         curr_scene = self.obs_websoc.get_current_scene()
         j = {"streaming": status.getStreaming(), "recording": status.getRecording(), "scene": curr_scene}
+        logging.debug("Control: stats get")
         res.body = json.dumps(j)
         res.status = falcon.HTTP_200
 
     def on_post_start(self, req, res):
         res = self.obs_websoc.start_stream()
-        print(res)
-        print("Stream started.")
+        logging.debug(f"Controls: start: {res}")
         if res:
             j = {"message": "Stream started."}
+            logging.info(f"Controls: Stream started.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_200
         else:
             j = {"message": "Error starting stream."}
+            logging.critical(f"Controls: Stream start failed.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_409
 
     def on_post_stop(self, req, res):
         res = self.obs_websoc.stop_stream()
-        print(res)
-        print("Stream stopped.")
+        logging.debug(f"Controls: stop: {res}")
         if res:
             j = {"message": "Stream stopped."}
+            logging.info(f"Controls: Stream stopped.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_200
         else:
             j = {"message": "Error stopping stream."}
+            logging.critical(f"Controls: Stream stop failed.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_409
 
     def on_post_brb(self, req, res):
         res = self.obs_websoc.go_brb(manual=True)
-        print(res)
-        print("Stream brb.")
+        logging.debug(f"Controls: brb: {res}")
         if res:
             j = {"message": "Going brb."}
+            logging.info(f"Controls: Stream brb.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_200
         else:
             j = {"message": "Error going brb."}
+            logging.critical(f"Controls: Stream brb failed.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_409
 
     def on_post_back(self, req, res):
         res = self.obs_websoc.go_normal(manual=True)
-        print(res)
-        print("Stream back.")
+        logging.debug(f"Controls: back: {res}")
         if res:
             j = {"message": "Going normal."}
+            logging.info(f"Controls: Stream back.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_200
         else:
             j = {"message": "Error going normal."}
+            logging.critical(f"Controls: Stream back failed.")
             res.body = json.dumps(j)
             res.status = falcon.HTTP_409
 
@@ -106,6 +114,8 @@ class KeyMiddleware(object):
         if key != self.api_key:
             err = json.dumps({"message": "API key required"})
             raise falcon.HTTPUnauthorized(err)
+
+logging.basicConfig()
 
 config = srtos.get_config()
 srt_thread = srtos.start_srt(config)

@@ -5,6 +5,7 @@ import json
 from os import set_blocking
 import secrets
 from datetime import datetime
+import logging
 
 
 class SRTThread(threading.Thread):
@@ -28,8 +29,8 @@ class SRTThread(threading.Thread):
         self.last_update = datetime.now()
 
         self.passphrase = passphrase
-        print("passphrase:", self.passphrase)
         if not self.passphrase:
+            logging.debug("Generated SRT passphrase.")
             self.generate_passphrase()
         div = "----------------------------------------------------------------"
         print(f"\nSRT Passphrase:")
@@ -66,7 +67,7 @@ class SRTThread(threading.Thread):
                 self.last_update = datetime.now()
             if msg:
                 self.last_message = msg[-1]
-                print(f"SRT Message: {msg}")
+                logging.info(f"SRT Message: {msg}")
             self.event.wait(self.update_interval)
 
     def start_process(self):
@@ -74,7 +75,7 @@ class SRTThread(threading.Thread):
         Start the SRT process.
         """
         srt_cmd = f"{self.srt_exec} -srctime -buffering 1 -s {self.stats_interval} -pf json \"{self.src_conn}\" {self.dst_conn}"
-        print("starting srt:", srt_cmd)
+        logging.info(f"Starting SRT with command: {srt_cmd}")
         return subprocess.Popen(
             f"{srt_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -83,6 +84,7 @@ class SRTThread(threading.Thread):
         """
         Start the SRT process.
         """
+        logging.info("Killing SRT process.")
         self.srt_process.kill()
 
     def get_raw_stats(self):
@@ -124,6 +126,7 @@ class SRTThread(threading.Thread):
         """
         self.kill_process()
         self.event.set()
+        logging.info("Stopping stats listener process.")
 
 class SRTLAThread(threading.Thread):
     def __init__(self, srtla_rec="srtla_rec", source_port=4000, destination_host="localhost", destination_port=4001):
@@ -143,7 +146,7 @@ class SRTLAThread(threading.Thread):
         Start the SRTla process.
         """
         srtla_cmd = f"{self.srtla_exec} {self.src_port} {self.host} {self.dst_port}"
-        print(f"starting srtla: {srtla_cmd}")
+        logging.info(f"Starting SRTLA: {srtla_cmd}")
         return subprocess.Popen(
             f"{srtla_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -152,6 +155,7 @@ class SRTLAThread(threading.Thread):
         """
         Start the SRT process.
         """
+        logging.info(f"Killing SRTLA")
         self.srtla_process.kill()
 
     def stop(self):
@@ -160,14 +164,15 @@ class SRTLAThread(threading.Thread):
         """
         self.kill_process()
         self.event.set()
+        logging.info("Stopping SRTLA process")
 
     def run(self):
         """
         Get the stats and save the last one to this object.
         """
-        print("SRTLA thread running.")
+        logging.info("SRTLA thread running.")
         while not self.event.is_set():
             msg = self.srtla_process.stdout.read()
             if msg:
-                print(f"SRTLA Message: {msg.decode('ASCII')}")
+                logging.info(f"SRTLA Message: {msg.decode('ASCII')}")
             self.event.wait(0.1)

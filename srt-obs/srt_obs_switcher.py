@@ -6,11 +6,14 @@ from time import sleep
 from itertools import chain
 import threading
 from datetime import datetime, timedelta
+import logging
 
 
 def get_config(config_file="srt_config.toml"):
     with open(config_file, 'r') as f:
-        return toml.load(f)
+        cfg = toml.load(f)
+        logging.debug(f"Config file:\n\n{cfg}")
+        return cfg
 
 class OBSWebsocket(object):
     def __init__(self, obs_cfg):
@@ -23,40 +26,50 @@ class OBSWebsocket(object):
         self.scenes = None
         self.get_scenes()
 
-    def connect(self):
-        self.ws = obsws(self.config["websocket_host"], self.config["websocket_port"], self.config["websocket_secret"])
+    def ws_connect(self):
+        logging.debug("OBS Command: Attempting websocket connection.")
+        ws_host = self.config["websocket_host"]
+        ws_port = self.config["websocket_port"]
+        ws_secret = self.config["websocket_secret"]
+        self.ws = obsws(ws_host, ws_port, ws_secret)
+        logging.debug(f"OBS command: connect. host: {ws_host}, port: {ws_port}, secret: {ws_secret}.")
         self.ws.connect()
+        print("Websocket:", self.ws)
 
     def disconnect(self):
+        logging.debug("OBS command: disconnect.")
         self.ws.disconnect()
 
     def get_scenes(self):
+        logging.debug("OBS command: get all scenes.")
         self.scenes = self.ws.call(requests.GetSceneList())
 
     def go_brb(self, manual=False):
-        print("brb")
+        logging.info("OBS command: switch to BRB scene.")
         if manual:
             self.manual_brb = True
         return self.ws.call(requests.SetCurrentScene(self.brb_scene))
 
     def go_normal(self, manual=False):
-        print("normal")
+        logging.info("OBS command: switch to normal scene.")
         if manual:
             self.manual_brb = False
         return self.ws.call(requests.SetCurrentScene(self.normal_scene))
 
     def start_stream(self):
-        print("starting stream")
+        logging.info("OBS command: start stream.")
         return self.ws.call(requests.StartStreaming())
 
     def stop_stream(self):
-        print("stopping stream")
+        logging.info("OBS command: stop stream.")
         return self.ws.call(requests.StopStreaming())
 
     def stream_status(self):
+        logging.debug("OBS command: get stream status.")
         return self.ws.call(requests.GetStreamingStatus())
 
     def get_current_scene(self):
+        logging.debug("OBS command: get current scene.")
         s = self.ws.call(requests.GetCurrentScene())
         return s.getName()
 
@@ -81,6 +94,7 @@ class OBSControl(threading.Thread):
         self.obs_websoc = OBSWebsocket(self.obs_cfg)
         self.debug = debug
         self.ra_samples = self.thresholds["running_avg"]
+        self.connected = False
         #  5 added because it seemed too short otherwise. This seems like a hack...
         self.update_timeout = timedelta(seconds=self.stabilize_dec * self.ra_samples * 5)
         # Make sure we're on our live scene.
@@ -96,10 +110,16 @@ class OBSControl(threading.Thread):
         while not self.event.is_set():
             idx += 1
             current_scene = self.obs_websoc.current_scene
-            if self.debug:
-                print(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
+            logging.debug(f"Current scene: {current_scene}, countdown: {stabilize_countdown}.")
             stats = self.srt_thread.last_stats
             timestamp = datetime.now()
+
+            # Want to track connection.
+            if "Accepted SRT source connection" in self.srt_thread.last_message:
+                logging.info(f"SRT: Source Connected.")
+                self.connected = True
+
+
             if stats != {}:
                 rtt_samples[idx % self.ra_samples] = stats["link"]["rtt"]
                 bitrate_samples[idx % self.ra_samples] = stats["send"]["mbitRate"]
@@ -107,25 +127,30 @@ class OBSControl(threading.Thread):
                 bitrate_ra = sum([x for x in bitrate_samples if x is not None]) / self.ra_samples
                 # pure stats based health determination
                 healthy = rtt_ra <= self.thresholds["rtt"] and bitrate_ra >= self.thresholds["bitrate"]
+                if not healthy:
+                    logging.warning(f"SRT: Failed RTT/BW health check.")
 
             # If the source disconnects due to a drop withou explicitly disconnecting, we should go brb.
             # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
+            # We should only complain about a failure to update stats when the source is connected. There may be an edge case here.
             last_update_delta = timestamp - self.srt_thread.last_update
-            if last_update_delta >= self.update_timeout:
-                if self.debug:
-                    print(f"Stats have not been updated for: {last_update_delta}, which is longer than cutoff: {self.update_timeout}.")
+            if last_update_delta >= self.update_timeout and self.connected:
+                logging.warning(f"SRT: Stats have not been updated for: {last_update_delta}, which is longer than cutoff: {self.update_timeout}.")
                 healthy = False
 
             # If the remote disconnects explicitly, go BRB.
             # To do this we parse the message from the SRT messages.
             if "SRT source disconnected" in self.srt_thread.last_message:
+                self.connected = False
+                logging.info(f"SRT: Source Disconnected.")
                 healthy = False
+
             if self.debug and stats != {}:
-                print(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
-                print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+                logging.warning(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
+                logging.warning(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
             elif self.debug:
-                print(f"No stats. Healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
-                print(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+                logging.warning(f"No stats. Healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
+                logging.warning(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
 
 
             # If scene has been set manually to BRB, don't switch away from the BRB scene.
@@ -134,17 +159,23 @@ class OBSControl(threading.Thread):
             elif healthy:
                 if stabilize_countdown >= 0.0:
                     stabilize_countdown -= self.stabilize_dec
+                    logging.debug(f"SRT: in stabilization countdown. {stabilize_countdown}")
                 elif current_scene == self.brb_scene and stabilize_countdown <= 0.0:
+                    logging.debug(f"SRT: stabilization countdown finished")
                     self.obs_websoc.go_normal()
             elif current_scene != self.brb_scene:
+                logging.debug(f"SRT: Switching to BRB scene.")
                 self.obs_websoc.go_brb()
                 stabilize_countdown = self.thresholds["stabilize_time"]
             else:
+                logging.debug(f"SRT: starting stabilization countdown {stabilize_countdown}")
                 stabilize_countdown = self.thresholds["stabilize_time"]
 
+            logging.debug(f"SRT: Waiting for {self.thresholds['check_interval']}")
             self.event.wait(self.thresholds["check_interval"])
 
     def stop(self):
+        logging.debug("SRT: stop triggered")
         self.event.set()
 
 
