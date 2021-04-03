@@ -25,6 +25,10 @@ While an eventual goal is to support arbitrary capture devices, the project has 
 - While audio volume can be changed using the API, there isn't anything in the webapp to adjust this (yet, probably).
 - There aren't Ubuntu packages for gst-interpipe and gstd, these will need to be built manually form source.
 
+## Config
+
+An example config exists at `example-config.toml` and the various options are documented there. To get started, copy it to `config.toml` and change it as needed.
+
 ## Automatic Start
 
 Basic systemd service files for gstd and this server are in the `support/` directory. As well, `gunicorn_conf.py` is to load settings from the config into gunicorn.
