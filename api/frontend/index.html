@@ -104,7 +104,7 @@
 			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="refresh" id="refresh">
 				Refresh
 			</button>
-			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="stop" id="status">
+			<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="status" id="status">
 				Status
 			</button>
 			<button type="button" onclick="button_click(this)" class="btn btn-success btn-md" name="mute" id="mute">
@@ -143,8 +143,14 @@
 					</div>
 					<div id="card-element-3" class="collapse">
 						<div class="card-body">
-							<button type="button" onclick="button_click(this)" class="btn btn-secondary btn-sm" name="brb" id="brb">
-								Live Scene
+							<button type="button" onclick="button_click(this)" class="btn btn-sm btn-warning" name="scene_unlock" id="scene_unlock">
+								Unlock Scene
+							</button>
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="scene_brb" id="scene_brb">
+								BRB Scene
+							</button>
+							<button type="button" onclick="button_click(this)" class="btn btn-primary btn-sm" name="scene_back" id="scene_back">
+								Normal Scene
 							</button>
 						</div>
 					</div>
@@ -186,6 +192,7 @@
 	<script>
 		var base_url = window.location.origin;
 		var refresh_stats = true;
+		var refresh_status = true;
 		var is_brb = false;
 		var muted = false;
 		var is_paused = false;
@@ -193,6 +200,7 @@
 		update_stream_status();
 		handle_pause(false);
 		var update_interval = setInterval(update_table, 1000);
+		var update_status_interval = setInterval(update_stream_status, 1000);
 		function button_click(elem) {
 			console.log(elem.id);
 			if (elem.id == "refresh") {
@@ -222,9 +230,9 @@
 				change_bitrate("res");
 				update_table();
 			}
-			if (elem.id == "status") {
-				update_stream_status();
-			}
+			// if (elem.id == "status") {
+			// 	update_stream_status();
+			// }
 			if (elem.id == "mute") {
 				toggle_audio();
 				update_table();
@@ -263,11 +271,34 @@
 					refresh_button.className += " btn-primary";
 				}
 			}
+			if (elem.id == "status") {
+				var status_button = document.querySelector("#status");
+				if(refresh_status == true) {
+					refresh_status = false;
+					clearInterval(update_status_interval);
+					status_button.className = status_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+					status_button.className += " btn-secondary";
+				}
+				else {
+					update_status_interval = setInterval(update_stream_status, 1000);
+					refresh_status = true;
+					status_button.className = status_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+					status_button.className += " btn-primary";
+				}
+			}
 			if (elem.id == "pause") {
 				handle_pause(true);
 			}
-			if (elem.id == "brb") {
-				handle_scene(true);
+
+			if (elem.id == "scene_brb") {
+				handle_scene(true, "brb");
+			}
+			if (elem.id == "scene_back") {
+				handle_scene(true, "back");
+			}
+			if (elem.id == "scene_unlock") {
+				// handle_scene(true)
+				switch_scene("unlock")
 			}
 		}
 		function update_table() {
@@ -333,16 +364,20 @@
 				response.text().then(function(text) {
 					var res = JSON.parse(text);
 					var streaming = res.streaming
+					var locked = res.locked
 					if (streaming == true) {
 						streaming = "<strong>" + streaming + "</strong>"
 					}
-					stream_status.innerHTML = "Streaming: " + streaming + ", scene: " + res.scene;
+					if (locked == true) {
+						locked = "<strong>" + locked + "</strong>"
+					}
+					stream_status.innerHTML = "Streaming: " + streaming + ", scene: " + res.scene + ", locked: " + locked;
 					if (res.scene == "BRB") {
 						is_brb = true;
 					} else {
 						is_brb = false;
 					}
-					handle_scene(false);
+					handle_scene(false, "");
 				});
 			});
 		}
@@ -395,22 +430,27 @@
 			}
 			postData(url, {});
 		}
-		function handle_scene(do_switch) {
-			var brb_button = document.querySelector("#brb");
+		function handle_scene(do_switch, scene) {
+			var unlock_button = document.querySelector("#scene_unlock");
+			var brb_button = document.querySelector("#scene_brb");
+			var back_button = document.querySelector("#scene_back");
+			console.log("brb: " + is_brb)
 			if(is_brb == true) {
 				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
-				brb_button.className += " btn-secondary";
-				brb_button.innerHTML = "Live Scene";
+				brb_button.className += " btn-primary";
+				back_button.className = back_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				back_button.className += " btn-secondary";
 				is_brb = false;
-				if (do_switch == true) {
+				if (do_switch == true && scene == "brb") {
 					switch_scene("brb")
 				}
 			} else {
-				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
-				brb_button.className += " btn-primary";
-				brb_button.innerHTML = "BRB scene";
+				back_button.className = back_button.className.replace( /(?:^|\s)btn-secondary(?!\S)/g , '' );
+				back_button.className += " btn-primary";
+				brb_button.className = brb_button.className.replace( /(?:^|\s)btn-primary(?!\S)/g , '' );
+				brb_button.className += " btn-secondary";
 				is_brb = true;
-				if (do_switch == true) {
+				if (do_switch == true && scene == "back") {
 					switch_scene("back")
 				}
 			}

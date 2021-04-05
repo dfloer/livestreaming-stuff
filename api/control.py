@@ -253,10 +253,12 @@ class StreamRemoteControl(object):
     # ToDo: This is all likely going to need a short timeout, or be async.
     def r_get(self, endpoint='/'):
         res = self.r_session.get(self.url + endpoint, verify=False)
+        logging.debug(f"StreamRemoteControl: r_get(endpoint={endpoint})")
         return res
 
     def r_post(self, endpoint='/', data={}):
         res = self.r_session.post(self.url + endpoint, data=data, verify=False)
+        logging.debug(f"StreamRemoteControl: r_post(endpoint={endpoint}, data={data})")
         return res
 
     def get_status(self):
@@ -282,6 +284,10 @@ class StreamRemoteControl(object):
     def back_stream(self):
         logging.debug("StreamRemoteControl: back")
         return self.get_res('/back')
+
+    def unlock_stream(self):
+        logging.debug("StreamRemoteControl: unlocked")
+        return self.get_res('/unlock')
 
     def get_res(self, endpoint):
         try:

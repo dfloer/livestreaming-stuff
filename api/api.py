@@ -249,6 +249,9 @@ class StreamControls(object):
         elif "back" in req.url:
             self.stream_remote.back_stream()
             msg = "Stream backed."
+        elif "unlock" in req.url:
+            self.stream_remote.unlock_stream()
+            msg = "Stream unlocked."
 
         logging.debug(f"StreamControls: on_post result: {msg}")
 
@@ -257,7 +260,7 @@ class StreamControls(object):
 
     def on_get(self, req, res):
         status = self.stream_remote.get_status()
-        logging.debug("StreamControls: {status}")
+        logging.debug(f"StreamControls: {status}")
         res.body = json.dumps(status, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
