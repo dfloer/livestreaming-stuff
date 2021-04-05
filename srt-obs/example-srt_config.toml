@@ -2,6 +2,8 @@
 listen_port = 4000  # port for the SRT relay to listen on
 output_port = 9000  # port for the SRT relaythat OBS connects to
 encryption_passphrase = ''  # SRT passphrase for encryption. If this is blank, one will be generated and printed in the console. This exact same key needs to be on the Nano as well.
+srt_latency = 2000  # Latency value in milliseconds. What is the maximum acceptable transmission latency, after which packets are dropped? This should be now lower than about 1000ms.
+loss_max_ssl = 50  # SRT packet reorder tolerance.
 
 srtla_internal_port = 0  # Optional internal port to use. By not setting this, port 4001 is used by default.
 srtla_rec_path = 'srtla_rec'  # Optional path to srtla_rec binary. If not set, it needs to be in your PATH.

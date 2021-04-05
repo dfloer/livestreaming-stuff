@@ -5,11 +5,11 @@ import json
 from os import set_blocking
 import secrets
 from datetime import datetime
-import logging
+from loguru import logger as logging
 
 
 class SRTThread(threading.Thread):
-    def __init__(self, srt_destination, srt_source="udp://:4200", stats_interval=100, update_interval=0.1, passphrase='', srt_live_transmit="srt-live-transmit"):
+    def __init__(self, srt_destination, srt_source="udp://:4200", stats_interval=100, update_interval=0.1, passphrase='', srt_live_transmit="srt-live-transmit", loss_max_ttl=50, srt_latency=2000):
         """
         Wrapper thread to start/stop srt-live-transmit and get stats out of it.
         Source and destination as per documentation at: https://github.com/Haivision/srt/blob/master/docs/srt-live-transmit.md
@@ -21,11 +21,15 @@ class SRTThread(threading.Thread):
             update_interval (float, optional): How often to should read stats from the process, too often and it blocks the web thread, not often enough and output from the process gets blocked.. Defaults to 0.1.
             passphrase (str, optional): Passphrase to use for encryption. If this is blank, one will be generated and printed on the console.
             srt_live_transmit (Path, optional): Path to the srt-live-transmit binary. If none specified, will use whatever one is in your path. Defaults to "srt-live-transmit".
+            loss_max_ttl (int, optional): Tolerance to packet re-ordering. Defaults to 50.
+            srt_latency (int, optional): Maximum acceptable transmission latency. If we go past this, drop the packets. Defaults to 200.
         """
         self.event = threading.Event()
         self.stats_interval = stats_interval
         self.update_interval = update_interval
         self.srt_exec = srt_live_transmit
+        self.loss_max_ttl = loss_max_ttl
+        self.srt_latency = srt_latency
         self.last_update = datetime.now()
 
         self.passphrase = passphrase
@@ -38,7 +42,7 @@ class SRTThread(threading.Thread):
         print(f"{self.passphrase}")
         print(div)
 
-        self.src_conn = f"{srt_source}?passphrase={self.passphrase}&enforcedencryption=true&mode=listener&lossmaxttl=50&latency=200"
+        self.src_conn = f"{srt_source}?passphrase={self.passphrase}&enforcedencryption=true&mode=listener&lossmaxttl={self.loss_max_ttl}&latency={self.srt_latency}"
         self.dst_conn = srt_destination
         self.srt_process = self.start_process()
         set_blocking(self.srt_process.stdout.fileno(), False)
@@ -65,6 +69,7 @@ class SRTThread(threading.Thread):
             if stats:
                 self.last_stats = stats[-1]
                 self.last_update = datetime.now()
+                logging.debug(f"SRT raw stats: {stats}")
             if msg:
                 self.last_message = msg[-1]
                 logging.info(f"SRT Message: {msg}")

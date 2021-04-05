@@ -5,7 +5,8 @@ from time import sleep
 import srt_obs_switcher as srtos
 import secrets
 from datetime import datetime
-import logging
+# import logging
+from loguru import logger as logging
 
 
 class StreamControls(object):
@@ -44,7 +45,10 @@ class StreamControls(object):
     def on_get(self, req, res):
         status = self.obs_websoc.stream_status()
         curr_scene = self.obs_websoc.get_current_scene()
-        j = {"streaming": status.getStreaming(), "recording": status.getRecording(), "scene": curr_scene}
+        j = {"streaming": status.getStreaming(),
+            "recording": status.getRecording(),
+            "scene": curr_scene,
+            "locked": self.obs_websoc.scene_locked,}
         logging.debug("Control: stats get")
         res.body = json.dumps(j)
         res.status = falcon.HTTP_200
@@ -78,7 +82,7 @@ class StreamControls(object):
             res.status = falcon.HTTP_409
 
     def on_post_brb(self, req, res):
-        res = self.obs_websoc.go_brb(manual=True)
+        res = self.obs_websoc.go_brb(locked=True)
         logging.debug(f"Controls: brb: {res}")
         if res:
             j = {"message": "Going brb."}
@@ -92,7 +96,7 @@ class StreamControls(object):
             res.status = falcon.HTTP_409
 
     def on_post_back(self, req, res):
-        res = self.obs_websoc.go_normal(manual=True)
+        res = self.obs_websoc.go_normal(locked=True)
         logging.debug(f"Controls: back: {res}")
         if res:
             j = {"message": "Going normal."}
@@ -105,6 +109,14 @@ class StreamControls(object):
             res.body = json.dumps(j)
             res.status = falcon.HTTP_409
 
+    def on_post_unlock(self, req, res):
+        self.obs_websoc.scene_locked = False
+        j = {"message": "Scene unlocked."}
+        logging.info(f"Controls: Scene Unlocked.")
+        res.body = json.dumps(j)
+        res.status = falcon.HTTP_200
+
+
 class KeyMiddleware(object):
     def __init__(self, api_key):
         self.api_key = api_key
@@ -115,7 +127,10 @@ class KeyMiddleware(object):
             err = json.dumps({"message": "API key required"})
             raise falcon.HTTPUnauthorized(err)
 
-logging.basicConfig()
+# logging.basicConfig(
+#     format='[%(asctime)s] [%(levelname)s] %(message)s',
+#     level=logging.DEBUG,
+#     datefmt="%Y-%m-%d %H:%M:%S %z")
 
 config = srtos.get_config()
 srt_thread = srtos.start_srt(config)
@@ -134,5 +149,6 @@ api.add_route("/start", stream_controls, suffix="start")
 api.add_route("/stop", stream_controls, suffix="stop")
 api.add_route("/brb", stream_controls, suffix="brb")
 api.add_route("/back", stream_controls, suffix="back")
+api.add_route("/unlock", stream_controls, suffix="unlock")
 api.add_route("/status", stream_controls)
 api.add_route("/", stream_controls)

@@ -6,7 +6,7 @@ from time import sleep
 from itertools import chain
 import threading
 from datetime import datetime, timedelta
-import logging
+from loguru import logger as logging
 
 
 def get_config(config_file="srt_config.toml"):
@@ -21,8 +21,8 @@ class OBSWebsocket(object):
         self.ws = None
         self.normal_scene = self.config["scene_name"]
         self.brb_scene = self.config["brb_scene_name"]
-        self.manual_brb = False
-        self.connect()
+        self.scene_locked = True
+        self.ws_connect()
         self.scenes = None
         self.get_scenes()
 
@@ -44,16 +44,16 @@ class OBSWebsocket(object):
         logging.debug("OBS command: get all scenes.")
         self.scenes = self.ws.call(requests.GetSceneList())
 
-    def go_brb(self, manual=False):
+    def go_brb(self, locked=False):
         logging.info("OBS command: switch to BRB scene.")
-        if manual:
-            self.manual_brb = True
+        if locked:
+            self.scene_locked = True
         return self.ws.call(requests.SetCurrentScene(self.brb_scene))
 
-    def go_normal(self, manual=False):
+    def go_normal(self, locked=False):
         logging.info("OBS command: switch to normal scene.")
-        if manual:
-            self.manual_brb = False
+        if locked:
+            self.scene_locked = False
         return self.ws.call(requests.SetCurrentScene(self.normal_scene))
 
     def start_stream(self):
@@ -115,7 +115,7 @@ class OBSControl(threading.Thread):
             timestamp = datetime.now()
 
             # Want to track connection.
-            if "Accepted SRT source connection" in self.srt_thread.last_message:
+            if "Accepted SRT source connection" in self.srt_thread.last_message and not self.connected:
                 logging.info(f"SRT: Source Connected.")
                 self.connected = True
 
@@ -123,12 +123,14 @@ class OBSControl(threading.Thread):
             if stats != {}:
                 rtt_samples[idx % self.ra_samples] = stats["link"]["rtt"]
                 bitrate_samples[idx % self.ra_samples] = stats["send"]["mbitRate"]
-                rtt_ra = sum([x for x in rtt_samples if x is not None]) / self.ra_samples
-                bitrate_ra = sum([x for x in bitrate_samples if x is not None]) / self.ra_samples
+                rtt_ra = sum([x for x in rtt_samples if not x in (None, 0)]) / self.ra_samples
+                bitrate_ra = sum([x for x in bitrate_samples if not x in (None, 0)]) / self.ra_samples
                 # pure stats based health determination
-                healthy = rtt_ra <= self.thresholds["rtt"] and bitrate_ra >= self.thresholds["bitrate"]
+                rtt_healthy = rtt_ra <= self.thresholds["rtt"]
+                bitrate_healthy = bitrate_ra >= self.thresholds["bitrate"]
+                healthy = rtt_healthy and bitrate_healthy
                 if not healthy:
-                    logging.warning(f"SRT: Failed RTT/BW health check.")
+                    logging.warning(f"SRT: Failed health check. RTT: {rtt_healthy}, bitrate: {bitrate_healthy}.")
 
             # If the source disconnects due to a drop withou explicitly disconnecting, we should go brb.
             # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
@@ -140,21 +142,21 @@ class OBSControl(threading.Thread):
 
             # If the remote disconnects explicitly, go BRB.
             # To do this we parse the message from the SRT messages.
-            if "SRT source disconnected" in self.srt_thread.last_message:
+            if "SRT source disconnected" in self.srt_thread.last_message and self.connected:
                 self.connected = False
                 logging.info(f"SRT: Source Disconnected.")
                 healthy = False
 
-            if self.debug and stats != {}:
-                logging.warning(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
-                logging.warning(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
-            elif self.debug:
-                logging.warning(f"No stats. Healthy: {healthy}, manual: {self.obs_websoc.manual_brb}")
-                logging.warning(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+            if stats != {}:
+                logging.debug(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, locked: {self.obs_websoc.scene_locked}")
+                logging.debug(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+            else:
+                logging.debug(f"No stats. Healthy: {healthy}, locked: {self.obs_websoc.scene_locked}")
+                logging.debug(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
 
 
-            # If scene has been set manually to BRB, don't switch away from the BRB scene.
-            if self.obs_websoc.manual_brb:
+            # If scene has been manually locked, don't switch scenes, even if we otherwise should.
+            if self.obs_websoc.scene_locked:
                 pass
             elif healthy:
                 if stabilize_countdown >= 0.0:
@@ -171,7 +173,7 @@ class OBSControl(threading.Thread):
                 logging.debug(f"SRT: starting stabilization countdown {stabilize_countdown}")
                 stabilize_countdown = self.thresholds["stabilize_time"]
 
-            logging.debug(f"SRT: Waiting for {self.thresholds['check_interval']}")
+            logging.debug(f"SRT: next update in {self.thresholds['check_interval']}s")
             self.event.wait(self.thresholds["check_interval"])
 
     def stop(self):
@@ -186,7 +188,9 @@ def start_srt(config):
         srt_destination=f"srt://:{srt_cfg['output_port']}",
         srt_source=f"srt://localhost:4001",
         passphrase=srt_passphrase,
-        srt_live_transmit=srt_cfg['srtla_slt_path'])
+        srt_live_transmit=srt_cfg['srtla_slt_path'],
+        loss_max_ttl=srt_cfg['srt_latency'],
+        srt_latency=srt_cfg['loss_max_ssl'],)
     srt_thread.daemon = True
     srt_thread.start()
     return srt_thread
