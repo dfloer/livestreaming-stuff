@@ -7,9 +7,11 @@ import re
 import threading
 import requests
 import alsaaudio
+import logging
 
 import gstd_streaming as gstds
 from pygstc.gstc import *
+from pygstc.gstc import GstdClient
 from collections import namedtuple
 from time import sleep
 from datetime import datetime
@@ -40,6 +42,7 @@ def find_devices():
             if name in v:
                 audio_idx = k
         devices[name] = [dev, usb, audio_idx]
+    logging.debug(f"Found devices: {devices}")
     return devices
 
 
@@ -98,19 +101,15 @@ def create_pipelines(client, config, debug=False):
     input2_dev = [devices[x] for x in devices.keys() if input2_config['name'] in x][0][0]
     input2_audio_dev = [devices[x] for x in devices.keys() if input2_config['name'] in x][0][2]
 
-    if debug:
-        print(f"Connected devices: {devices}")
-        print(f"input1 using: {input1_dev}, input2 using: {input2_dev}.")
-        print("\nParsed config TOML:")
-        pp = pprint.PrettyPrinter(compact=False)
-        print("\nEncoder config:")
-        pp.pprint(encoder_config)
-        print("\nFirst input config:")
-        pp.pprint(input1_config)
-        print("\nSecond input config:")
-        pp.pprint(input2_config)
-        print("\nOutput config:")
-        pp.pprint(output_config)
+    logging.debug(f"Connected devices: {devices}")
+    logging.debug(f"input1 using: {input1_dev}")
+    logging.debug(f"input2 using: {input2_dev}")
+    logging.debug(f"Parsed config TOML:")
+    pp = pprint.PrettyPrinter(compact=False)
+    logging.debug(f"\nEncoder config:\n {pp.pformat(encoder_config)}")
+    logging.debug(f"\nFirst input config:\n {pp.pformat(input1_config)}")
+    logging.debug(f"\nSecond input config:\n {pp.pformat(input2_config)}")
+    logging.debug(f"\nOutput config:\n {pp.pformat(output_config)}")
 
     # Common interpipesink options for inputs.
     interpipe_sink_options = (
@@ -118,14 +117,12 @@ def create_pipelines(client, config, debug=False):
     )
     input1_audio_gst = f"alsasrc device=hw:{input1_audio_dev} ! identity name=delay signal-handoffs=TRUE"
     input1_gst = f"v4l2src device={input1_dev} ! {input1_config['gst']} ! interpipesink name=input1-video {interpipe_sink_options} {input1_audio_gst} ! interpipesink name=input1-audio"# {interpipe_sink_options}"
-    if debug:
-        print("input1 gst:", input1_gst)
+    logging.debug(f"input1 gst: {input1_gst}")
     input1_config["full_gst"] = input1_gst
     input1 = gstds.Pipeline(gstdclient=client, name="input1", config=input1_config, debug=debug)
     input2_audio_gst = f"alsasrc device=hw:{input2_audio_dev} ! identity name=delay signal-handoffs=TRUE"
     input2_gst = f"v4l2src device={input2_dev} ! {input2_config['gst']} ! interpipesink name=input2-video {interpipe_sink_options} {input2_audio_gst} ! interpipesink name=input2-audio"# {interpipe_sink_options}"
-    if debug:
-        print("input2 gst:", input2_gst)
+    logging.debug(f"input2 gst: {input2_gst}")
     input2_config["full_gst"] = input2_gst
     input2 = gstds.Pipeline(gstdclient=client, name="input2", config=input2_config, debug=debug)
 
@@ -144,8 +141,7 @@ def create_pipelines(client, config, debug=False):
     output1_sink = f"h265parse ! mux. mpegtsmux name=mux ! rndbuffersize max=1316 min=1316 ! udpsink host=localhost port=4200"
     encoder_input = f"nvvidconv ! textoverlay text=bitrate: ! nvvidconv "
     output1_gst = f"{output1_inter} ! {encoder_input} ! {encoder_config['gst']} ! {output1_sink} {output1_audio_inter}"
-    if debug:
-        print("output1 gst:", output1_gst)
+    logging.debug(f"output1 gst: {output1_gst}")
 
     output_config["full_gst"] = output1_gst
     output1 = gstds.Output(gstdclient=client, name="output1", config=output_config, encoder_config=encoder_config, debug=debug)
@@ -161,6 +157,7 @@ def start_pipelines(pipelines):
     Convenience function to start the pipelines.
     """
     for p in pipelines.values():
+        logging.debug(f"control: Starting pipeline {p.name}")
         p.play()
 
 def stop_pipelines(pipelines):
@@ -168,7 +165,7 @@ def stop_pipelines(pipelines):
     Convenience function to stop the pipelines.
     """
     for p in pipelines.values():
-        print(f"[{datetime.now()}] Attempting to cleanup {p.name}.")
+        logging.debug(f"control: Attempting to cleanup {p.name}.")
         p.cleanup()
 
 def setup():
@@ -213,8 +210,7 @@ class BitrateWatcherThread(threading.Thread):
             if stats == {}:
                 continue
             rtt = stats["link"]["rtt"]
-            if self.debug:
-                print("bw:", bitrate_steps, self.output_pipe.current_bitrate, "rtt:", rtt, "backoff:", self.backoff, "locked:", self.output_pipe.bitrate_locked)
+            logging.debug(f"Control: bw: {bitrate_steps} {self.output_pipe.current_bitrate}, rtt: {rtt}, backoff: {self.backoff}, locked: {self.output_pipe.bitrate_locked}")
             # To override the backoff behaviour.
             if self.output_pipe.bitrate_locked:
                 # If the bitrate is manually locked, don't switch, even if we otherwise would be.
@@ -223,15 +219,13 @@ class BitrateWatcherThread(threading.Thread):
                 self.backoff = max(0, min(self.backoff + 1, len(bitrate_steps) - 1))
                 self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
                 self.output_pipe.output_pipeline.set_bitrate(bitrate_steps[self.backoff])
-                if self.debug:
-                    print(f"BitrateWatcher: Drop bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
+                logging.debug(f"BitrateWatcher: Drop bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
                 cooldown = self.cooldown_time
             elif self.backoff > 0 and rtt < self.rtt_normal_threshold:
                 self.backoff = max(0, min(self.backoff - 1, len(bitrate_steps) - 1))
                 self.output_pipe.current_bitrate = bitrate_steps[self.backoff]
                 self.output_pipe.output_pipeline.set_bitrate(bitrate_steps[self.backoff])
-                if self.debug:
-                    print(f"BitrateWatcher: Increase bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
+                logging.debug(f"BitrateWatcher: Increase bitrate to {bitrate_steps[self.backoff]}. RTT: {rtt}, backoff: {self.backoff}")
                 cooldown = self.cooldown_time
             self.event.wait(self.update_interval + cooldown)
 
@@ -239,6 +233,7 @@ class BitrateWatcherThread(threading.Thread):
         """
         Stops the srt-live-transmit process and the stats-gathering loop.
         """
+        logging.debug("Control: stop.")
         self.event.set()
 
 class StreamRemoteControl(object):
@@ -269,19 +264,23 @@ class StreamRemoteControl(object):
             res = self.r_get('/status')
             self.last_status = json.loads(res.text)
         except Exception as e:
-            print(e)
+            logging.error(f"StreamRemoteControl: gets_status Exception {e}")
         return self.last_status
 
     def start_stream(self):
+        logging.debug("StreamRemoteControl: start")
         return self.get_res('/start')
 
     def stop_stream(self):
+        logging.debug("StreamRemoteControl: stop")
         return self.get_res('/stop')
 
     def brb_stream(self):
+        logging.debug("StreamRemoteControl: brb")
         return self.get_res('/brb')
 
     def back_stream(self):
+        logging.debug("StreamRemoteControl: back")
         return self.get_res('/back')
 
     def get_res(self, endpoint):
@@ -291,8 +290,10 @@ class StreamRemoteControl(object):
                 msg = {"message": "success"}
             else:
                 msg = {"message": "failure"}
+            logging.debug("StreamRemoteControl: res: {msg}")
         except Exception:
             msg = {"message": "failure"}
+            logging.error("StreamRemoteControl: res: {msg}")
         return json.dumps(msg)
 
 
@@ -308,8 +309,7 @@ def setup_source_routing(interfaces, debug=False):
             continue
         cmd = f"sudo ./if-post-up-source-route.sh {iface}"
         res = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-        if debug:
-            print(res)
+        logging.info(f"source routing: {res}")
 
 def set_clocks(debug=False):
     """
@@ -319,8 +319,7 @@ def set_clocks(debug=False):
         debug (bool, optional): Whether or not to print debug info. Defaults to False.
     """
     res = subprocess.Popen("sudo jetson_clocks", stdout=subprocess.PIPE, shell=True)
-    if debug:
-        print(res)
+    logging.debug(f"Set_clocks: {res}")
 
 
 if __name__ == "__main__":
@@ -332,12 +331,11 @@ if __name__ == "__main__":
     idx = 0
     sleep_time = 5
     text = [x["name"] for x in pipelines["output1"].list_elements() if "textoverlay" in x["name"]][0]
-    if debug:
-        print(f"text name: {text}")
+    logging.debug(f"text name: {text}")
 
     try:
         while True:
-            print(f"idx: {idx}")
+            logging.debug(f"idx: {idx}")
             idx += 1
             for bitrate in test_bitrates:
                 pipelines["output1"].set_bitrate(bitrate)
@@ -352,5 +350,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(e)
+        logging.error(f"{e}")
     stop_pipelines(pipelines)

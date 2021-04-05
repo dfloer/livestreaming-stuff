@@ -1,4 +1,5 @@
 import netifaces
+import logging
 from control import read_config
 from pathlib import Path
 from collections import defaultdict
@@ -24,11 +25,13 @@ def find_ips(devs=[], exclude_lo=True):
                 ip_addr = a["addr"]
                 if "169.254" not in ip_addr:  # Want to ignore addresses of 169.254.x.x (automatic private) because they won't work.
                     ip_addrs[x] += [ip_addr]
+                else:
+                    logging.debug(f"IPv4LL {ip_addr} found on {x}")
         except KeyError:
             pass  # No key 2, which is IPv4 addresses.
         except ValueError:
             pass  # If devs contains an interface that isn't part of the system.
-    print(f"find_ips: ip_addrs {ip_addrs}")
+    logging.info(f"find_ips: ip_addrs {ip_addrs}")
     return ip_addrs
 
 
@@ -44,7 +47,7 @@ def srtla_ip_setup(file_path="srtla_ips.txt"):
     """
     config = read_config()["srtla_config"]
     output_path = Path(config["srtla_ip_path"])
-    print("output_path:", output_path)
+    logging.info(f"output_path: {output_path}")
     if not config["srtla_ip_path"]:
         output_path = Path(file_path)
         ip_addrs = find_ips(devs=config["srtla_devices"])

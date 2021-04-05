@@ -9,11 +9,16 @@ from api import StreamControls
 from api import AudioControls
 from api import StreamOutput
 from time import sleep
+import logging
 
 from srt_stats import SRTThread, SRTLAThread
 from helpers import srtla_ip_setup
 import control
 
+logging.basicConfig(
+    format='[%(asctime)s] [%(levelname)s] %(message)s',
+    level=logging.DEBUG,
+    datefmt="%Y-%m-%d %H:%M:%S %z")
 
 class StaticResource(object):
     """
@@ -23,7 +28,7 @@ class StaticResource(object):
         resp.status = falcon.HTTP_200
         resp.content_type = "text/html"
         fn = path.join("frontend", filename)
-        print(fn)
+        logging.debug(f"Static: {fn}")
         with open(fn, 'r') as f:
             resp.body = f.read()
 
@@ -38,7 +43,7 @@ srt_watcher_thread.start()
 srt_protocol, srt_hostname, srt_port = re.split('://|:', pipelines["output1"].url)
 
 srtla_ips_path, srtla_ip_addrs = srtla_ip_setup()
-print("srtla ips:", srtla_ips_path)
+logging.info(f"srtla ips: {srtla_ips_path}")
 
 control.setup_source_routing(srtla_ip_addrs.keys(), debug=True)
 control.set_clocks(debug=True)

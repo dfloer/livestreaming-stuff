@@ -2,6 +2,7 @@ import threading
 import subprocess
 import select
 import json
+import logging
 from os import set_blocking
 
 
@@ -43,7 +44,7 @@ class SRTThread(threading.Thread):
                 self.last_stats = stats[-1]
             if msg:
                 self.last_message = msg[-1]
-                print(f"Message: {msg}")
+                logging.info(f"SRTThread: Message: {msg}")
             self.event.wait(self.update_interval)
 
     def start_process(self):
@@ -51,6 +52,7 @@ class SRTThread(threading.Thread):
         Start the SRT process.
         """
         srt_cmd = f"srt-live-transmit -srctime -buffering 1 -s {self.stats_interval} -pf json {self.src_conn} \"{self.dst_conn}\""
+        logging.debug(f"SRTThread: started with {srt_cmd}")
         return subprocess.Popen(
             f"{srt_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -59,6 +61,7 @@ class SRTThread(threading.Thread):
         """
         Start the SRT process.
         """
+        logging.debug(f"SRTThread: kill process")
         self.srt_process.kill()
 
     def get_raw_stats(self):
@@ -98,6 +101,7 @@ class SRTThread(threading.Thread):
         """
         Stops the srt-live-transmit process and the stats-gathering loop.
         """
+        logging.debug(f"SRTThread: stop process")
         self.kill_process()
         self.event.set()
 
@@ -114,14 +118,13 @@ class SRTLAThread(threading.Thread):
         self.srtla_process = self.start_process()
         set_blocking(self.srtla_process.stdout.fileno(), False)
         super().__init__(group=None)
-        # print("srtla:", self.srtla_process.stdout.read())
 
     def start_process(self):
         """
         Start the SRTla process.
         """
         srtla_cmd = f"{self.srtla_exec} {self.src_port} {self.host} {self.dst_port} {self.ip_file}"
-        print(f"starting srtla: {srtla_cmd}")
+        logging.info(f"starting srtla: {srtla_cmd}")
         return subprocess.Popen(
             f"{srtla_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -130,12 +133,14 @@ class SRTLAThread(threading.Thread):
         """
         Start the SRT process.
         """
+        logging.debug(f"SRTLAThread: kill process")
         self.srtla_process.kill()
 
     def stop(self):
         """
         Stops the srt-live-transmit process and the stats-gathering loop.
         """
+        logging.debug(f"SRTLAThread: stop process")
         self.kill_process()
         self.event.set()
 
@@ -143,9 +148,9 @@ class SRTLAThread(threading.Thread):
         """
         Get the stats and save the last one to this object.
         """
-        print("SRTLA thread running.")
+        logging.info("SRTLAThread: SRTLA thread running.")
         while not self.event.is_set():
             msg = self.srtla_process.stdout.read()
             if msg:
-                print(f"SRTLA Message: {msg.decode('ASCII')}")
+                logging.info(f"SRTLAThread: SRTLA Message: {msg.decode('ASCII')}")
             self.event.wait(0.1)
