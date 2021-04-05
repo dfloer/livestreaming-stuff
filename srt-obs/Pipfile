@@ -10,6 +10,7 @@ obs-websocket-py = "*"
 gunicorn = "*"
 falcon = "*"
 toml = "*"
+loguru = "*"
 
 [requires]
 python_version = "3.8"
