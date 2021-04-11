@@ -21,7 +21,7 @@ class OBSWebsocket(object):
         self.ws = None
         self.normal_scene = self.config["scene_name"]
         self.brb_scene = self.config["brb_scene_name"]
-        self.scene_locked = True
+        self.scene_locked = False
         self.ws_connect()
         self.scenes = None
         self.get_scenes()
@@ -97,6 +97,8 @@ class OBSControl(threading.Thread):
         self.connected = False
         #  5 added because it seemed too short otherwise. This seems like a hack...
         self.update_timeout = timedelta(seconds=self.stabilize_dec * self.ra_samples * 5)
+        self.cooldown_timeout = timedelta(seconds=self.thresholds["cooldown_time"])
+        self.cooldown_timer = datetime.now()
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
         super().__init__(group=None)
@@ -119,10 +121,11 @@ class OBSControl(threading.Thread):
                 logging.info(f"SRT: Source Connected.")
                 self.connected = True
 
-
             if stats != {}:
                 rtt_samples[idx % self.ra_samples] = stats["link"]["rtt"]
-                bitrate_samples[idx % self.ra_samples] = stats["send"]["mbitRate"]
+                # This is a workaround for not always getting the same stats.
+                bitrate_samples[idx % self.ra_samples] = max(stats["send"]["mbitRate"], stats['recv']['mbitRate'])
+                logging.debug(f"{stats['send']['mbitRate']}, {stats['recv']['mbitRate']}")
                 rtt_ra = sum([x for x in rtt_samples if not x in (None, 0)]) / self.ra_samples
                 bitrate_ra = sum([x for x in bitrate_samples if not x in (None, 0)]) / self.ra_samples
                 # pure stats based health determination
@@ -131,6 +134,8 @@ class OBSControl(threading.Thread):
                 healthy = rtt_healthy and bitrate_healthy
                 if not healthy:
                     logging.warning(f"SRT: Failed health check. RTT: {rtt_healthy}, bitrate: {bitrate_healthy}.")
+            else:
+                logging.info(f"SRT stats blank.")
 
             # If the source disconnects due to a drop withou explicitly disconnecting, we should go brb.
             # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
@@ -148,11 +153,14 @@ class OBSControl(threading.Thread):
                 healthy = False
 
             if stats != {}:
-                logging.debug(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, locked: {self.obs_websoc.scene_locked}")
+                logging.debug(f"rtt: {rtt_ra}, bitrate: {bitrate_ra}, healthy: {healthy}, locked: {self.obs_websoc.scene_locked}, connected: {self.connected}.")
                 logging.debug(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
             else:
-                logging.debug(f"No stats. Healthy: {healthy}, locked: {self.obs_websoc.scene_locked}")
+                logging.debug(f"No stats. Healthy: {healthy}, locked: {self.obs_websoc.scene_locked}, connected: {self.connected}.")
                 logging.debug(f"rtt hist: {rtt_samples}, bitrate hist: {bitrate_samples}, update delta: {last_update_delta}.")
+
+            if not self.obs_websoc.scene_locked and not self.connected:
+                healthy = False
 
 
             # If scene has been manually locked, don't switch scenes, even if we otherwise should.
@@ -166,9 +174,13 @@ class OBSControl(threading.Thread):
                     logging.debug(f"SRT: stabilization countdown finished")
                     self.obs_websoc.go_normal()
             elif current_scene != self.brb_scene:
-                logging.debug(f"SRT: Switching to BRB scene.")
-                self.obs_websoc.go_brb()
-                stabilize_countdown = self.thresholds["stabilize_time"]
+                if timestamp > self.cooldown_timer:
+                    logging.debug(f"SRT: Switching to BRB scene.")
+                    self.obs_websoc.go_brb()
+                    stabilize_countdown = self.thresholds["stabilize_time"]
+                    self.cooldown_timer = datetime.now() + self.cooldown_timeout
+                else:
+                    logging.info(f"BRB triggered, but on cooldown for {timestamp - self.cooldown_timeout}.")
             else:
                 logging.debug(f"SRT: starting stabilization countdown {stabilize_countdown}")
                 stabilize_countdown = self.thresholds["stabilize_time"]

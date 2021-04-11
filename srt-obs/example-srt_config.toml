@@ -24,6 +24,7 @@ bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb
 running_avg = 5  # To smooth over small blips, this many check_intervals are used to calculate a running average.
 check_interval = 0.1  # seconds. How often to check the stats
 stabilize_time = 2  # How many seconds do we have to be under the thresholds to go return from brb.
+cooldown_time = 5  # How many seconds to wait before going back to the BRB scene after we've been in it. This is to prevent jumping back and forth rapidly.
 
 [api]
 listen = "0.0.0.0:4443"  # ip address and port.
