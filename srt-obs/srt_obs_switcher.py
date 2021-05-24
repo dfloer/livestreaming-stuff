@@ -48,12 +48,14 @@ class OBSWebsocket(object):
         logging.info("OBS command: switch to BRB scene.")
         if locked:
             self.scene_locked = True
+        # self.media_source_toggle()
         return self.ws.call(requests.SetCurrentScene(self.brb_scene))
 
     def go_normal(self, locked=False):
         logging.info("OBS command: switch to normal scene.")
         if locked:
             self.scene_locked = False
+        self.media_source_toggle()
         return self.ws.call(requests.SetCurrentScene(self.normal_scene))
 
     def start_stream(self):
@@ -76,6 +78,57 @@ class OBSWebsocket(object):
     @property
     def current_scene(self):
         return self.ws.call(requests.GetCurrentScene()).getName()
+
+    def get_media_sources(self):
+        srcs = self.ws.call(requests.GetSourcesList()).getSources()
+        media_src_types = ("vlc_source", "ffmpeg_source")
+        media_sources = [x for x in srcs if x['typeId'] in media_src_types]
+        logging.debug(f"OBS command: get media sources.\n{media_sources}")
+        return media_sources
+
+    @property
+    def active_media_source(self, live_scene_name="IRL Input"):
+        # This assumes that the only visible media source is active.
+        srcs = self.get_media_sources()
+        for s in srcs:
+            k = s["name"]
+            if self.ws.call(requests.GetSceneItemProperties(k, live_scene_name)).getVisible():
+                return k
+
+    def stop_media_source(self, source_name):
+        logging.debug(f"OBS command: stop media source '{source_name}'.")
+        return self.ws.call(requests.StopMedia(source_name))
+
+    def play_media_source(self, source_name):
+        logging.debug(f"OBS command: play media source '{source_name}'.")
+        return self.ws.call(requests.PlayPauseMedia(source_name, "play"))
+
+    def pause_media_source(self, source_name):
+        logging.debug(f"OBS command: pause media source '{source_name}'.")
+        return self.ws.call(requests.PlayPauseMedia(source_name, "pause"))
+
+    def restart_active_source(self):
+        active_src = self.active_media_source
+        logging.warning(f"OBS command: twiddle media source '{active_src}'.")
+        self.stop_media_source(active_src)
+        self.play_media_source(active_src)
+
+
+    def media_source_toggle(self):
+        """
+        This is a janky, awful hack, but for some reason OBS 26.1.1 seems to hit a black screen with the media source and not recover.
+        Stopping/playing, pausing/playing, toggling visibility don't do anything.
+        The _only_ way to get it to come back reliably seems to be to change a setting in the dialog.
+        Seekable doesn't seem to affect things, so the hack is to toggle it.
+        """
+        active_src = self.active_media_source
+        src_settings = self.ws.call(requests.GetSourceSettings(active_src)).getSourceSettings()
+        if "seekable" not in src_settings:
+            logging.warning(f"OBS command: toggle failed, {active_src} not a Media Source.")
+        else:
+            s = src_settings["seekable"]
+            logging.warning(f"OBS command: toggle {active_src} from {s} to {not s}.")
+            self.ws.call(requests.SetSourceSettings(active_src, {"seekable": not s}))
 
     def __str__(self):
         return f"Scenes: {self.scenes}, normal name: {self.normal_scene}, brb name: {self.brb_scene}."
@@ -125,7 +178,7 @@ class OBSControl(threading.Thread):
                 rtt_samples[idx % self.ra_samples] = stats["link"]["rtt"]
                 # This is a workaround for not always getting the same stats.
                 bitrate_samples[idx % self.ra_samples] = max(stats["send"]["mbitRate"], stats['recv']['mbitRate'])
-                logging.debug(f"{stats['send']['mbitRate']}, {stats['recv']['mbitRate']}")
+                logging.info(f"{stats['send']['mbitRate']}, {stats['recv']['mbitRate']}")
                 rtt_ra = sum([x for x in rtt_samples if not x in (None, 0)]) / self.ra_samples
                 bitrate_ra = sum([x for x in bitrate_samples if not x in (None, 0)]) / self.ra_samples
                 # pure stats based health determination
@@ -174,6 +227,7 @@ class OBSControl(threading.Thread):
                     logging.debug(f"SRT: stabilization countdown finished")
                     self.obs_websoc.go_normal()
             elif current_scene != self.brb_scene:
+                logging.info(f"{timestamp}, {self.cooldown_timer}")
                 if timestamp > self.cooldown_timer:
                     logging.debug(f"SRT: Switching to BRB scene.")
                     self.obs_websoc.go_brb()
