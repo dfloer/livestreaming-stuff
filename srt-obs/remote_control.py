@@ -5,8 +5,9 @@ from time import sleep
 import srt_obs_switcher as srtos
 import secrets
 from datetime import datetime
-# import logging
+import logging as lg
 from loguru import logger as logging
+import sys
 
 
 class StreamControls(object):
@@ -127,10 +128,11 @@ class KeyMiddleware(object):
             err = json.dumps({"message": "API key required"})
             raise falcon.HTTPUnauthorized(err)
 
-# logging.basicConfig(
-#     format='[%(asctime)s] [%(levelname)s] %(message)s',
-#     level=logging.DEBUG,
-#     datefmt="%Y-%m-%d %H:%M:%S %z")
+# Make loguru behave like logging, and use gunicorn's log level.
+gunicorn_logger = lg.getLogger('gunicorn.error')
+if gunicorn_logger.level == 20:
+    logging.remove()
+    logging.add(sys.stderr, level="INFO")
 
 config = srtos.get_config()
 srt_thread = srtos.start_srt(config)
