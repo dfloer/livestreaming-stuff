@@ -145,7 +145,7 @@ obs_ctrl.start()
 
 stream_controls = StreamControls(obs_ctrl)
 key_check = KeyMiddleware(stream_controls.api_key)
-api = application = falcon.API(middleware=[key_check])
+api = application = falcon.App(middleware=[key_check])
 api.add_route("/heartbeat", stream_controls, suffix="heartbeat")
 api.add_route("/start", stream_controls, suffix="start")
 api.add_route("/stop", stream_controls, suffix="stop")
