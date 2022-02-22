@@ -31,6 +31,7 @@ class SRTThread(threading.Thread):
         self.loss_max_ttl = loss_max_ttl
         self.srt_latency = srt_latency
         self.last_update = datetime.now()
+        self.connected = False
 
         self.passphrase = passphrase
         if not self.passphrase:
@@ -70,9 +71,20 @@ class SRTThread(threading.Thread):
                 self.last_stats = stats[-1]
                 self.last_update = datetime.now()
                 logging.debug(f"SRT raw stats: {stats}")
+                # If the stats have updated, assume that SRT is connected.
+                self.connected = True
             if msg:
                 self.last_message = msg[-1]
                 logging.info(f"SRT Message: {msg}")
+
+            # Track connection state, because the switcher uses it to determine health.
+            if "SRT source disconnected" in self.last_message and self.connected:
+                self.connected = False
+                logging.warning(f"SRT: Source Disconnected.")
+            elif "Accepted SRT source connection" in self.last_message and not self.connected:
+                self.connected = True
+                logging.warning(f"SRT: Source Connected.")
+
             self.event.wait(self.update_interval)
 
     def start_process(self):
