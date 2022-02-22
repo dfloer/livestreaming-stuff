@@ -65,6 +65,7 @@ class SRTThread(threading.Thread):
         """
         Get the stats and save the last one to this object.
         """
+        logging.info("SRT thread started.")
         while not self.event.is_set():
             stats, msg = self.stats_parse()
             if stats:
@@ -78,6 +79,8 @@ class SRTThread(threading.Thread):
                 logging.info(f"SRT Message: {msg}")
 
             # Track connection state, because the switcher uses it to determine health.
+            # This is only for the incoming connection, not the target connection.
+            # If that were to break, well, OBS is broken and there isn't much to do...
             if "SRT source disconnected" in self.last_message and self.connected:
                 self.connected = False
                 logging.warning(f"SRT: Source Disconnected.")
@@ -99,7 +102,7 @@ class SRTThread(threading.Thread):
 
     def kill_process(self):
         """
-        Start the SRT process.
+        Kill the SRT process.
         """
         logging.info("Killing SRT process.")
         self.srt_process.kill()
@@ -160,7 +163,7 @@ class SRTLAThread(threading.Thread):
 
     def start_process(self):
         """
-        Start the SRTla process.
+        Start the SRTLA process.
         """
         srtla_cmd = f"{self.srtla_exec} {self.src_port} {self.host} {self.dst_port}"
         logging.info(f"Starting SRTLA: {srtla_cmd}")
@@ -170,7 +173,7 @@ class SRTLAThread(threading.Thread):
 
     def kill_process(self):
         """
-        Start the SRT process.
+        Start the SRTLA process.
         """
         logging.info(f"Killing SRTLA")
         self.srtla_process.kill()
@@ -187,7 +190,7 @@ class SRTLAThread(threading.Thread):
         """
         Get the stats and save the last one to this object.
         """
-        logging.info("SRTLA thread running.")
+        logging.info("SRTLA thread started.")
         while not self.event.is_set():
             msg = self.srtla_process.stdout.read()
             if msg:
