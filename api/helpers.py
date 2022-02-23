@@ -1,5 +1,5 @@
 import netifaces
-import logging
+from loguru import logger as logging
 from control import read_config
 from pathlib import Path
 from collections import defaultdict

@@ -2,7 +2,7 @@ import threading
 import subprocess
 import select
 import json
-import logging
+from loguru import logger as logging
 from os import set_blocking
 
 
@@ -42,6 +42,7 @@ class SRTThread(threading.Thread):
             stats, msg = self.stats_parse()
             if stats:
                 self.last_stats = stats[-1]
+                logging.debug(f"SRTThread: stats: {stats}")
             if msg:
                 self.last_message = msg[-1]
                 logging.info(f"SRTThread: Message: {msg}")

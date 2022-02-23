@@ -2,7 +2,7 @@ from pygstc.gstc import *
 from pygstc.gstc import GstdClient
 from dataclasses import dataclass
 from datetime import datetime
-import logging
+from loguru import logger as logging
 from pygstc.gstcerror import GstdError
 
 @dataclass(init=False)

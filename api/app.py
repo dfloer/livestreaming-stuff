@@ -9,16 +9,19 @@ from api import StreamControls
 from api import AudioControls
 from api import StreamOutput
 from time import sleep
-import logging
+import logging as lg
+import sys
+from loguru import logger as logging
 
 from srt_stats import SRTThread, SRTLAThread
 from helpers import srtla_ip_setup
 import control
 
-logging.basicConfig(
-    format='[%(asctime)s] [%(levelname)s] %(message)s',
-    level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S %z")
+# Make loguru behave like logging, and use gunicorn's log level.
+gunicorn_logger = lg.getLogger('gunicorn.error')
+if gunicorn_logger.level == 20:
+    logging.remove()
+    logging.add(sys.stderr, level="INFO")
 
 class StaticResource(object):
     """

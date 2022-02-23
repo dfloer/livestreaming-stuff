@@ -7,7 +7,7 @@ import re
 import threading
 import requests
 import alsaaudio
-import logging
+from loguru import logger as logging
 
 import gstd_streaming as gstds
 from pygstc.gstc import *

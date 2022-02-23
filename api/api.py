@@ -3,7 +3,7 @@ import falcon
 import control
 import requests
 import urllib
-import logging
+from loguru import logger as logging
 
 class Inputs(object):
     def __init__(self, input1, input2, output_pipeline):
