@@ -19,8 +19,8 @@ scene_name = "IRL Input"  # name in OBS for the normal scene
 brb_scene_name = "BRB"  # name in obs of the brb scene
 
 [brb_thresholds]
-rtt = 150  # If the RTT goes _above_ this number, go brb
-bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb
+rtt = 150  # If the RTT goes _above_ this number, go brb. -1 to disable the check.
+bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb. -1 to disable the check.
 running_avg = 5  # To smooth over small blips, this many check_intervals are used to calculate a running average.
 check_interval = 0.1  # seconds. How often to check the stats
 stabilize_time = 2  # How many seconds do we have to be under the thresholds to go return from brb.
