@@ -310,7 +310,7 @@ def start_srt(config):
         passphrase=srt_passphrase,
         srt_live_transmit=srt_cfg['srtla_slt_path'],
         loss_max_ttl=srt_cfg['srt_latency'],
-        srt_latency=srt_cfg['loss_max_ssl'],)
+        srt_latency=srt_cfg['loss_max_ttl'],)
     srt_thread.daemon = True
     srt_thread.start()
     return srt_thread
