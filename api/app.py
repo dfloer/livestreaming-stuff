@@ -35,7 +35,7 @@ class StaticResource(object):
         with open(fn, 'r') as f:
             resp.body = f.read()
 
-api = application = falcon.API()
+api = application = falcon.App()
 
 pipelines, pipelines_meta, srt_passphrase = control.setup()
 
