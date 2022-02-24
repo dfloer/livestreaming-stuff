@@ -33,7 +33,7 @@ class StaticResource(object):
         fn = path.join("frontend", filename)
         logging.debug(f"Static: {fn}")
         with open(fn, 'r') as f:
-            resp.body = f.read()
+            resp.data = f.read()
 
 api = application = falcon.App()
 
@@ -51,7 +51,7 @@ logging.info(f"srtla ips: {srtla_ips_path}")
 control.setup_source_routing(srtla_ip_addrs.keys(), debug=True)
 control.set_clocks(debug=True)
 
-srtla_thread = SRTLAThread(srtla_send="/home/bob/git/srtla/srtla_send", destination_host=srt_hostname, destination_port=srt_port, ip_file=srtla_ips_path)
+srtla_thread = SRTLAThread(srtla_send="srtla_send", destination_host=srt_hostname, destination_port=srt_port, ip_file=srtla_ips_path)
 srtla_thread.daemon = True
 srtla_thread.start()
 

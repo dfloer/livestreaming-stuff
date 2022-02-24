@@ -34,7 +34,7 @@ class Inputs(object):
         logging.info(f"Inputs: activated: {inp}")
 
     def on_get(self, req, res, input_name=''):
-        res.body = self.as_json()
+        res.text = self.as_json()
         res.status = falcon.HTTP_200
         logging.debug(f"Inputs: on_get() called.")
 
@@ -52,7 +52,7 @@ class Inputs(object):
         else:
             err = True
 
-        res.body = self.as_json()
+        res.text = self.as_json()
         if not err:
             res.status = falcon.HTTP_200
             logging.debug(f"Inputs: on_post() success.")
@@ -82,7 +82,7 @@ class Outputs(object):
         return json.dumps(j, ensure_ascii=False)
 
     def on_get(self, req, res):
-        res.body = self.as_json()
+        res.text = self.as_json()
         res.status = falcon.HTTP_200
 
     def on_post(self, req, res, bitrate=None):
@@ -113,14 +113,14 @@ class Outputs(object):
                 if bitrate in self.bitrate_steps:
                     self.current_bitrate = bitrate
                     res.status = falcon.HTTP_200
-                    res.body = self.as_json()
+                    res.text = self.as_json()
                     logging.debug(f"Outputs: bitrate set.")
                 else:
                     res.status = falcon.HTTP_400
-                    res.body = json.dumps({"error": "bitrate not in bitrate_steps"}, ensure_ascii=False)
+                    res.text = json.dumps({"error": "bitrate not in bitrate_steps"}, ensure_ascii=False)
                     logging.warning(f"Outputs: bitrate not in bitrate_steps.")
             except Exception:
-                res.body = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
+                res.text = json.dumps({"error": "invalid bitrate"}, ensure_ascii=False)
                 res.status = falcon.HTTP_400
         self.output_pipeline.set_bitrate(self.current_bitrate)
 
@@ -154,7 +154,7 @@ class SRT(object):
 
         logging.debug(f"SRT: get stats: {doc}.")
 
-        res.body = json.dumps(doc, ensure_ascii=False)
+        res.text = json.dumps(doc, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
     def censor_url(self, raw_url=None, mode="partial"):
@@ -208,7 +208,7 @@ class SRTLA(object):
             "ip_list": self.ip_addrs
         }
         logging.debug("SRTLA: on_get ips.")
-        res.body = json.dumps(doc, ensure_ascii=False)
+        res.text = json.dumps(doc, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
 
@@ -218,13 +218,13 @@ class StreamOutput(object):
 
     def on_post_play(self, req, res):
         self.output_pipeline.play()
-        res.body = json.dumps({"message": "Stream playing."}, ensure_ascii=False)
+        res.text = json.dumps({"message": "Stream playing."}, ensure_ascii=False)
         res.status = falcon.HTTP_200
         logging.debug(f"StreamOutput: Playing")
 
     def on_post_pause(self, req, res):
         self.output_pipeline.pause()
-        res.body = json.dumps({"message": "Stream paused."}, ensure_ascii=False)
+        res.text = json.dumps({"message": "Stream paused."}, ensure_ascii=False)
         res.status = falcon.HTTP_200
         logging.debug(f"StreamOutput: Paused")
 
@@ -255,13 +255,13 @@ class StreamControls(object):
 
         logging.debug(f"StreamControls: on_post result: {msg}")
 
-        res.body = json.dumps({"message": msg}, ensure_ascii=False)
+        res.text = json.dumps({"message": msg}, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
     def on_get(self, req, res):
         status = self.stream_remote.get_status()
         logging.debug(f"StreamControls: {status}")
-        res.body = json.dumps(status, ensure_ascii=False)
+        res.text = json.dumps(status, ensure_ascii=False)
         res.status = falcon.HTTP_200
 
 class AudioControls(object):
@@ -270,21 +270,21 @@ class AudioControls(object):
 
     def on_get(self, req, res):
         active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
-        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
-        logging.debug(f"AudioControls: active: {active_audio}, get results: {res.body}.")
+        res.text = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
+        logging.debug(f"AudioControls: active: {active_audio}, get results: {res.text}.")
         res.status = falcon.HTTP_200
 
     def on_post_mute(self, req, res):
         self.output_pipe.toggle_audio_mute()
         active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
-        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
-        logging.debug(f"AudioControls: mute, active: {active_audio}, post results: {res.body}.")
+        res.text = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
+        logging.debug(f"AudioControls: mute, active: {active_audio}, post results: {res.text}.")
         res.status = falcon.HTTP_200
 
     def on_post_name(self, req, res, input_name):
         print(f"Switch to input {input_name}.")
         self.output_pipe.switch_audio_src(input_name)
         active_audio = self.output_pipe.get_property("output1-audio", "listen-to")
-        res.body = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
-        logging.debug(f"AudioControls: name, active: {active_audio}, post results: {res.body}.")
+        res.text = json.dumps({"active": active_audio, "muted": self.output_pipe.audio_mute, "total_inputs": 2}, ensure_ascii=False)
+        logging.debug(f"AudioControls: name, active: {active_audio}, post results: {res.text}.")
         res.status = falcon.HTTP_200
