@@ -16,7 +16,8 @@ def get_config(config_file="srt_config.toml"):
 
 def get_log_level(log_level="info"):
     log_map = {10: "debug", 20: "info", 30: "warning", 40: "error"}
-    return log_map.get(log_level, "info")
+    log_level = log_map.get(log_level, "info") if log_level not in log_map.values() else log_level
+    return log_level
 
 
 def configure_logging(log_level="info"):
