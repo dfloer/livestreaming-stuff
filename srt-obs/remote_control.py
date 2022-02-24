@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime
 import logging as lg
 from loguru import logger as logging
-import sys
+from utils import configure_logging
 
 
 class StreamControls(object):
@@ -128,13 +128,11 @@ class KeyMiddleware(object):
             err = json.dumps({"message": "API key required"})
             raise falcon.HTTPUnauthorized(err)
 
-# Make loguru behave like logging, and use gunicorn's log level.
-gunicorn_logger = lg.getLogger('gunicorn.error')
-if gunicorn_logger.level == 20:
-    logging.remove()
-    logging.add(sys.stderr, level="INFO")
-
 config = srtos.get_config()
+
+# Configure logging first, before doing anything else.
+configure_logging(log_level=config["logging"]["log_level"])
+
 srt_thread = srtos.start_srt(config)
 srtla_thread = srtos.start_srtla(config)
 debug = False
@@ -154,3 +152,12 @@ api.add_route("/back", stream_controls, suffix="back")
 api.add_route("/unlock", stream_controls, suffix="unlock")
 api.add_route("/status", stream_controls)
 api.add_route("/", stream_controls)
+
+def on_exit(arbiter):
+    logging.info("Shutting down.")
+    logging.info(f"SRT Thread start: {srt_thread.start_time}")
+    logging.info(f"SRTLA Thread start: {srt_thread.start_time}")
+    logging.info(f"OBS control Thread start: {obs_ctrl.start_time}")
+    srt_thread.stop()
+    srtla_thread.stop()
+    obs_ctrl.stop()

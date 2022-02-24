@@ -7,13 +7,7 @@ from itertools import chain
 import threading
 from datetime import datetime, timedelta
 from loguru import logger as logging
-
-
-def get_config(config_file="srt_config.toml"):
-    with open(config_file, 'r') as f:
-        cfg = toml.load(f)
-        logging.debug(f"Config file:\n\n{cfg}")
-        return cfg
+from utils import get_config
 
 class OBSWebsocket(object):
     def __init__(self, obs_cfg):

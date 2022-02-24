@@ -32,6 +32,7 @@ class SRTThread(threading.Thread):
         self.srt_latency = srt_latency
         self.last_update = datetime.now()
         self.connected = False
+        self.start_time = None
 
         self.passphrase = passphrase
         if not self.passphrase:
@@ -96,6 +97,7 @@ class SRTThread(threading.Thread):
         """
         srt_cmd = f"{self.srt_exec} -srctime -buffering 1 -s {self.stats_interval} -pf json \"{self.src_conn}\" {self.dst_conn}"
         logging.info(f"Starting SRT with command: {srt_cmd}")
+        self.start_time = datetime.now()
         return subprocess.Popen(
             f"{srt_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -104,7 +106,7 @@ class SRTThread(threading.Thread):
         """
         Kill the SRT process.
         """
-        logging.info("Killing SRT process.")
+        logging.warning(f"Killing SRT process running since: {self.start_time}")
         self.srt_process.kill()
 
     def get_raw_stats(self):
@@ -158,6 +160,7 @@ class SRTLAThread(threading.Thread):
         self.event = threading.Event()
         self.srtla_process = self.start_process()
         set_blocking(self.srtla_process.stdout.fileno(), False)
+        self.start_time = None
         super().__init__(group=None)
         # print("srtla:", self.srtla_process.stdout.read())
 
@@ -167,6 +170,7 @@ class SRTLAThread(threading.Thread):
         """
         srtla_cmd = f"{self.srtla_exec} {self.src_port} {self.host} {self.dst_port}"
         logging.info(f"Starting SRTLA: {srtla_cmd}")
+        self.start_time = datetime.now()
         return subprocess.Popen(
             f"{srtla_cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -175,7 +179,7 @@ class SRTLAThread(threading.Thread):
         """
         Start the SRTLA process.
         """
-        logging.info(f"Killing SRTLA")
+        logging.warning(f"Killing SRTLA process running since: {self.start_time}")
         self.srtla_process.kill()
 
     def stop(self):
