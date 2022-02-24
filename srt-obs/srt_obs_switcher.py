@@ -155,6 +155,7 @@ class OBSControl(threading.Thread):
         self.update_timeout = timedelta(seconds=self.stabilize_dec * self.ra_samples * 5)
         self.cooldown_timeout = timedelta(seconds=self.thresholds["cooldown_time"])
         self.cooldown_timer = datetime.now()
+        self.start_time = datetime.now()
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
         super().__init__(group=None)
@@ -186,7 +187,19 @@ class OBSControl(threading.Thread):
             # track connection state
             self.connected = self.srt_thread.connected
 
-            if stats != {}:
+            # If the source disconnects due to a drop without explicitly disconnecting, we should go brb.
+            # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
+            # We should only complain about a failure to update stats when the source is connected. There may be an edge case here.
+            last_update_delta = timestamp - stats_time
+            stats_fresh = True
+            if last_update_delta >= self.update_timeout and self.connected and healthy:
+                logging.warning(f"SRT: Stats have not been updated for: {last_update_delta}, which is longer than cutoff: {self.update_timeout}.")
+                healthy = False
+                # Otherwise the health checks use stale stats, and while this check doesn't need to be before this part, this seems cleaner.
+                stats_fresh = False
+                stats = {}
+                
+            if stats != {} and stats_fresh:
                 bitrate_healthy = self.check_bitrate_health(idx)
                 rtt_healthy = self.check_rtt_health(idx)
                 if bitrate_healthy is None:
@@ -198,22 +211,16 @@ class OBSControl(threading.Thread):
                     healthy = True
                 else:
                     healthy = False
-            else:
+            elif stats == {} and stats_fresh:
                 logging.info(f"SRT stats blank.")
+            else:
+                pass
 
             if not self.connected:
                 healthy = False
             else:
                 pass
                 # healthy = True
-
-            # If the source disconnects due to a drop without explicitly disconnecting, we should go brb.
-            # This is explicitly needed because the stats don't update in this case, so the code never sees the bitrate disappear.
-            # We should only complain about a failure to update stats when the source is connected. There may be an edge case here.
-            last_update_delta = timestamp - stats_time
-            if last_update_delta >= self.update_timeout and self.connected and healthy:
-                logging.warning(f"SRT: Stats have not been updated for: {last_update_delta}, which is longer than cutoff: {self.update_timeout}.")
-                healthy = False
 
             if stats != {}:
                 logging.debug(f"rtt: {self.rtt_ra}, bitrate: {self.bitrate_ra}, healthy: {healthy}, locked: {self.obs_websoc.scene_locked}, connected: {self.connected}.")
@@ -256,7 +263,7 @@ class OBSControl(threading.Thread):
             self.event.wait(self.thresholds["check_interval"])
 
     def stop(self):
-        logging.debug("SRT: stop triggered")
+        logging.info(f"Stopping OBS control thread started at {self.start_time}.")
         self.event.set()
 
     def check_bitrate_health(self, idx):
