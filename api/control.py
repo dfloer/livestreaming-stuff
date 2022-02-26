@@ -42,7 +42,7 @@ def find_devices():
             if name in v:
                 audio_idx = k
         devices[name] = [dev, usb, audio_idx]
-    logging.debug(f"Found devices: {devices}")
+    logging.info(f"Found devices: {devices}")
     return devices
 
 
@@ -96,6 +96,14 @@ def create_pipelines(client, config, debug=False):
         initial_input = "input2"
 
     devices = find_devices()
+    # Do some basic assertion checking. This should support 1-~4 devices, but currently is hard-coded for 2.
+    if len(devices) == 0:
+        logging.error("No capture devices found!")
+        assert len(devices) != 0
+    elif len(devices) == 1:
+        logging.error("One capture devices found! Minimum is 2.")
+        assert len(devices) > 1
+
     input1_dev = [devices[x] for x in devices.keys() if input1_config['name'] in x][0][0]
     input1_audio_dev = [devices[x] for x in devices.keys() if input1_config['name'] in x][0][2]
     input2_dev = [devices[x] for x in devices.keys() if input2_config['name'] in x][0][0]
