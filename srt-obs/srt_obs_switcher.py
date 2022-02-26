@@ -7,74 +7,89 @@ from itertools import chain
 import threading
 from datetime import datetime, timedelta
 from loguru import logger as logging
-from utils import get_config
+from utils import get_config, ThreadManager
+import threading
 
-class OBSWebsocket(object):
+class OBSWebsocket:
     def __init__(self, obs_cfg):
-        self.config = obs_cfg
-        self.ws = None
+        self.config = obs_cfg["obs"]
         self.normal_scene = self.config["scene_name"]
         self.brb_scene = self.config["brb_scene_name"]
         self.scene_locked = False
-        self.ws_connect()
+        self.ws = None
         self.scenes = None
-        self.get_scenes()
+        self.is_connected = False
 
     def ws_connect(self):
         logging.debug("OBS Command: Attempting websocket connection.")
         ws_host = self.config["websocket_host"]
         ws_port = self.config["websocket_port"]
         ws_secret = self.config["websocket_secret"]
-        self.ws = obsws(ws_host, ws_port, ws_secret)
+        ws = obsws(ws_host, ws_port, ws_secret)
         logging.debug(f"OBS command: connect. host: {ws_host}, port: {ws_port}, secret: {ws_secret}.")
-        self.ws.connect()
-        logging.debug(f"OBS Command: Websocket successful: {self.ws}")
+        ws.connect()
+        logging.debug(f"OBS Command: Websocket successful: {ws}")
+        return ws
+
+    def ws_call(self, *args, **kwargs):
+        """
+        This is a workaround for not being able to share a single websocket across multiple processes.
+        At least, not without getting into IPC stuff, which seems like a bad idea.
+        Basically, defer connecting the websocket until the first time a call is made to it.
+        This _does_ mean that there will be one connection per thread/process using it.
+        """
+        if not self.is_connected:
+            self.ws = self.ws_connect()
+            logging.warning(f"OBS command: first connect.")
+            self.is_connected = True
+        return self.ws.call(*args, **kwargs)
 
     def disconnect(self):
-        logging.debug("OBS command: disconnect.")
+        logging.info("OBS command: disconnect.")
         self.ws.disconnect()
+        self.is_connected = False
 
     def get_scenes(self):
-        logging.debug("OBS command: get all scenes.")
-        self.scenes = self.ws.call(requests.GetSceneList())
+        logging.info("OBS command: get all scenes.")
+        self.scenes = self.ws_call(requests.GetSceneList())
 
     def go_brb(self, locked=False):
         logging.info("OBS command: switch to BRB scene.")
         if locked:
             self.scene_locked = True
         # self.media_source_toggle()
-        return self.ws.call(requests.SetCurrentScene(self.brb_scene))
+        return self.ws_call(requests.SetCurrentScene(self.brb_scene))
 
     def go_normal(self, locked=False):
         logging.info("OBS command: switch to normal scene.")
         if locked:
             self.scene_locked = False
         self.media_source_toggle()
-        return self.ws.call(requests.SetCurrentScene(self.normal_scene))
+        return self.ws_call(requests.SetCurrentScene(self.normal_scene))
 
     def start_stream(self):
         logging.info("OBS command: start stream.")
-        return self.ws.call(requests.StartStreaming())
+        return self.ws_call(requests.StartStreaming())
 
     def stop_stream(self):
         logging.info("OBS command: stop stream.")
-        return self.ws.call(requests.StopStreaming())
+        return self.ws_call(requests.StopStreaming())
 
     def stream_status(self):
-        logging.debug("OBS command: get stream status.")
-        return self.ws.call(requests.GetStreamingStatus())
+        logging.info("OBS command: get stream status.")
+        return self.ws_call(requests.GetStreamingStatus())
 
     def get_current_scene(self):
-        logging.debug("OBS command: get current scene.")
-        s = self.ws.call(requests.GetCurrentScene())
-        return s.getName()
+        logging.info("OBS command: get current scene.")
+        return self.current_scene
 
     @property
     def current_scene(self):
-        return self.ws.call(requests.GetCurrentScene()).getName()
+        logging.debug(f"OBS property: current_scene.")
+        return self.ws_call(requests.GetCurrentScene()).getName()
 
     def get_media_sources(self):
-        srcs = self.ws.call(requests.GetSourcesList()).getSources()
+        srcs = self.ws_call(requests.GetSourcesList()).getSources()
         media_src_types = ("vlc_source", "ffmpeg_source")
         media_sources = [x for x in srcs if x['typeId'] in media_src_types]
         logging.debug(f"OBS command: get media sources.\n{media_sources}")
@@ -83,23 +98,24 @@ class OBSWebsocket(object):
     @property
     def active_media_source(self, live_scene_name="IRL Input"):
         # This assumes that the only visible media source is active.
+        logging.debug(f"OBS property: active_media_source.")
         srcs = self.get_media_sources()
         for s in srcs:
             k = s["name"]
-            if self.ws.call(requests.GetSceneItemProperties(k, live_scene_name)).getVisible():
+            if self.ws_call(requests.GetSceneItemProperties(k, live_scene_name)).getVisible():
                 return k
 
     def stop_media_source(self, source_name):
         logging.debug(f"OBS command: stop media source '{source_name}'.")
-        return self.ws.call(requests.StopMedia(source_name))
+        return self.ws_call(requests.StopMedia(source_name))
 
     def play_media_source(self, source_name):
         logging.debug(f"OBS command: play media source '{source_name}'.")
-        return self.ws.call(requests.PlayPauseMedia(source_name, "play"))
+        return self.ws_call(requests.PlayPauseMedia(source_name, "play"))
 
     def pause_media_source(self, source_name):
         logging.debug(f"OBS command: pause media source '{source_name}'.")
-        return self.ws.call(requests.PlayPauseMedia(source_name, "pause"))
+        return self.ws_call(requests.PlayPauseMedia(source_name, "pause"))
 
     def restart_active_source(self):
         active_src = self.active_media_source
@@ -117,20 +133,21 @@ class OBSWebsocket(object):
         """
         pass
         #active_src = self.active_media_source
-        # src_settings = self.ws.call(requests.GetSourceSettings(active_src)).getSourceSettings()
+        # src_settings = self.ws_call(requests.GetSourceSettings(active_src)).getSourceSettings()
         # if "seekable" not in src_settings:
         #     logging.warning(f"OBS command: toggle failed, {active_src} not a Media Source.")
         # else:
         #     s = src_settings["seekable"]
         #     logging.warning(f"OBS command: toggle {active_src} from {s} to {not s}.")
-        #     self.ws.call(requests.SetSourceSettings(active_src, {"seekable": not s}))
+        #     self.ws_call(requests.SetSourceSettings(active_src, {"seekable": not s}))
 
-    def __str__(self):
-        return f"Scenes: {self.scenes}, normal name: {self.normal_scene}, brb name: {self.brb_scene}."
+    # def __str__(self):
+    #     return f"Scenes: {self.scenes}, normal name: {self.normal_scene}, brb name: {self.brb_scene}."
 
 
 class OBSControl(threading.Thread):
-    def __init__(self, srt_thread, config_path="srt_config.toml", debug=False):
+    def __init__(self, srt_thread, websocket, config_path="srt_config.toml"):
+        super().__init__()
         self.event = threading.Event()
         self.config = get_config(config_path)
         self.srt_cfg = self.config["srt_relay"]
@@ -139,8 +156,7 @@ class OBSControl(threading.Thread):
         self.thresholds = self.config["brb_thresholds"]
         self.brb_scene = self.obs_cfg["brb_scene_name"]
         self.stabilize_dec = self.thresholds["check_interval"]
-        self.obs_websoc = OBSWebsocket(self.obs_cfg)
-        self.debug = debug
+        self.obs_websoc = websocket
         self.ra_samples = self.thresholds["running_avg"]
         self.bitrate_samples = [None for _ in range(self.ra_samples)]
         self.rtt_samples = [None for _ in range(self.ra_samples)]
@@ -150,9 +166,9 @@ class OBSControl(threading.Thread):
         self.cooldown_timeout = timedelta(seconds=self.thresholds["cooldown_time"])
         self.cooldown_timer = datetime.now()
         self.start_time = datetime.now()
+        self.name="OBSctrl"
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
-        super().__init__(group=None)
 
     @property
     def bitrate_ra(self):
@@ -173,6 +189,7 @@ class OBSControl(threading.Thread):
         while not self.event.is_set():
             idx += 1
             current_scene = self.obs_websoc.current_scene
+            scene_locked = self.obs_websoc.scene_locked
             logging.debug(f"Current scene: {current_scene}, countdown: {round(stabilize_countdown, 2)}.")
             stats = self.srt_thread.last_stats
             stats_time = self.srt_thread.last_update
@@ -217,17 +234,18 @@ class OBSControl(threading.Thread):
                 # healthy = True
 
             if stats != {}:
-                logging.debug(f"rtt: {self.rtt_ra}, bitrate: {self.bitrate_ra}, healthy: {healthy}, locked: {self.obs_websoc.scene_locked}, connected: {self.connected}.")
+                logging.debug(f"rtt: {self.rtt_ra}, bitrate: {self.bitrate_ra}, healthy: {healthy}, locked: {scene_locked}, connected: {self.connected}.")
                 logging.debug(f"rtt hist: {self.rtt_samples}, bitrate hist: {self.bitrate_samples}, update delta: {last_update_delta}.")
             else:
-                logging.debug(f"No stats. Healthy: {healthy}, locked: {self.obs_websoc.scene_locked}, connected: {self.connected}.")
+                logging.debug(f"No stats. Healthy: {healthy}, locked: {scene_locked}, connected: {self.connected}.")
                 logging.debug(f"rtt hist: {self.rtt_samples}, bitrate hist: {self.bitrate_samples}, update delta: {last_update_delta}.")
 
-            if not self.obs_websoc.scene_locked and not self.connected:
+            if not scene_locked and not self.connected:
+            # if not self.obs_websoc.scene_locked and not self.connected:
                 healthy = False
 
             # If scene has been manually locked, don't switch scenes, even if we otherwise should.
-            if self.obs_websoc.scene_locked:
+            if scene_locked:
                 pass
             elif healthy:
                 if stabilize_countdown >= 0.0:
