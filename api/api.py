@@ -15,7 +15,8 @@ class Inputs(object):
     def as_json(self):
         which = self.active_input
         nice_name = self.input1_pipeline.nice_name if which == self.input1_pipeline.name else self.input2_pipeline.nice_name
-        j = {"active_input": which, "nice_name": nice_name, "total_inputs": 2}
+        all_inputs = [self.input1_pipeline.name, self.input2_pipeline.name]
+        j = {"active_input": which, "nice_name": nice_name, "total_inputs": len(all_inputs), "all_inputs": all_inputs}
         logging.debug(f"Inputs: json: {j}")
         return json.dumps(j, ensure_ascii=False)
 
