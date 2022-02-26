@@ -27,7 +27,7 @@ class SRTThread(ThreadManager):
         self.passphrase = get_passphrase(passphrase)
         self.last_message = ''
         self.last_stats = {}
-        self._name = "SLT"
+        self.name = "SLT"
         self.last_update = datetime.now()
         self.connected = False
         # srt-live-transmit command variables
@@ -127,7 +127,7 @@ class SRTLAThread(ThreadManager):
         self.srtla_exec = srtla_rec
         self.host = destination_host
         self.cmd = f"{self.srtla_exec} {self.src_port} {self.host} {self.dst_port}"
-        self._name = "SRTLA"
+        self.name = "SRTLA"
         self.start_process()
 
     def run_inner(self):

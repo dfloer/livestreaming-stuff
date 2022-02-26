@@ -59,17 +59,25 @@ def get_passphrase(passphrase=""):
     return passphrase
 
 
+def generate_api_key(cfg, key_len=32):
+    api_key = cfg["api"]["api_key"]
+    if not api_key:
+        return secrets.token_urlsafe(key_len)
+    return api_key
+
+
 class ThreadManager(threading.Thread):
     def __init__(self, name=""):
+        super().__init__()
         self._pid = None
         self._pgid = None
         self._process = None
         self.start_time = None
-        self._name = name
+        self.name = name
         self.event = threading.Event()
         self.wait_interval = 0.001
         self.cmd = ""
-        super().__init__(group=None)
+        
 
     def start_process(self, blocking=False):
         """
@@ -78,14 +86,14 @@ class ThreadManager(threading.Thread):
             cmd (string): Command strings, as would be passed into a shell.
             blocking (bool, optional): True if the processes output should be blocking, false otherwise. Defaults to False.
         """
-        logging.info(f"{self._name}: Process starting with command: {self.cmd}.")
+        logging.info(f"{self.name}: Process starting with command: {self.cmd}.")
         self._process = subprocess.Popen(
             f"{self.cmd}", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
         self._pid = self._process.pid
         self._pgid = os.getpgid(self._pid)
         logging.warning(
-            f"{self._name}: Process stared, pid={self._pid}, pgid={self._pgid}."
+            f"{self.name}: Process stared, pid={self._pid}, pgid={self._pgid}."
         )
         self.start_time = datetime.now()
         os.set_blocking(self._process.stdout.fileno(), blocking)
@@ -96,13 +104,13 @@ class ThreadManager(threading.Thread):
         """
         self.kill_process()
         self.event.set()
-        logging.info(f"{self._name}: Process stopped.")
+        logging.info(f"{self.name}: Process stopped.")
 
     def kill_process(self):
         """
         Kills the process spawned.
         """
-        logging.warning(f"{self._name}: Killing process with pid={self._pid}.")
+        logging.warning(f"{self.name}: Killing process with pid={self._pid}.")
         self._process.terminate()
 
     def run(self):
@@ -110,7 +118,7 @@ class ThreadManager(threading.Thread):
         Loop to run in this thread.
         Note that in order to do anything, the run_inner() function needs to be overridded in a subclass.
         """
-        logging.warning(f"{self._name}: run thread started.")
+        logging.warning(f"{self.name}: run thread started.")
         while not self.event.is_set():
             self.run_inner()
             self.event.wait(self.wait_interval)
@@ -121,7 +129,7 @@ class ThreadManager(threading.Thread):
         Args:
             wait_time (float, optional): Time, in seconds, to wait before the process restarts. Defaults to 1.0.
         """
-        logging.warning(f"{self._name}: Process restarted.")
+        logging.warning(f"{self.name}: Process restarted.")
         self.kill_process()
         self.tsleep(wait_time)
         self.start_process()
@@ -132,7 +140,7 @@ class ThreadManager(threading.Thread):
         Args:
             t (float): Time to sleep, in seconds.
         """
-        logging.debug(f"{self._name}: tsleep for {t}s.")
+        logging.debug(f"{self.name}: tsleep for {t}s.")
         threading.Timer(t, self.tsleep, kwargs={"t": t}).start()
         time.sleep(t)
 
