@@ -15,7 +15,6 @@ class OBSWebsocket:
         self.config = obs_cfg["obs"]
         self.normal_scene = self.config["scene_name"]
         self.brb_scene = self.config["brb_scene_name"]
-        self.scene_locked = False
         self.ws = None
         self.scenes = None
         self.is_connected = False
@@ -53,17 +52,13 @@ class OBSWebsocket:
         logging.info("OBS command: get all scenes.")
         self.scenes = self.ws_call(requests.GetSceneList())
 
-    def go_brb(self, locked=False):
+    def go_brb(self):
         logging.info("OBS command: switch to BRB scene.")
-        if locked:
-            self.scene_locked = True
         # self.media_source_toggle()
         return self.ws_call(requests.SetCurrentScene(self.brb_scene))
 
-    def go_normal(self, locked=False):
+    def go_normal(self):
         logging.info("OBS command: switch to normal scene.")
-        if locked:
-            self.scene_locked = False
         self.media_source_toggle()
         return self.ws_call(requests.SetCurrentScene(self.normal_scene))
 
@@ -146,7 +141,7 @@ class OBSWebsocket:
 
 
 class OBSControl(threading.Thread):
-    def __init__(self, srt_thread, websocket, config_path="srt_config.toml"):
+    def __init__(self, srt_thread, websocket, shared_state, config_path="srt_config.toml"):
         super().__init__()
         self.event = threading.Event()
         self.config = get_config(config_path)
@@ -167,8 +162,21 @@ class OBSControl(threading.Thread):
         self.cooldown_timer = datetime.now()
         self.start_time = datetime.now()
         self.name="OBSctrl"
+        self.shared_state = shared_state
         # Make sure we're on our live scene.
         self.obs_websoc.go_normal()
+
+    @property
+    def scene_locked(self):
+        res = self.shared_state.get("scene_lock")
+        logging.debug(f"OBSControl: scene_locked() -> {res}")
+        return res
+
+    @scene_locked.setter
+    def scene_locked(self, v):
+        res = bool(v)
+        logging.debug(f"OBSControl: scene_locked({res})")
+        return self.shared_state.put("scene_lock", res)
 
     @property
     def bitrate_ra(self):
@@ -189,7 +197,6 @@ class OBSControl(threading.Thread):
         while not self.event.is_set():
             idx += 1
             current_scene = self.obs_websoc.current_scene
-            scene_locked = self.obs_websoc.scene_locked
             logging.debug(f"Current scene: {current_scene}, countdown: {round(stabilize_countdown, 2)}.")
             stats = self.srt_thread.last_stats
             stats_time = self.srt_thread.last_update
@@ -234,18 +241,18 @@ class OBSControl(threading.Thread):
                 # healthy = True
 
             if stats != {}:
-                logging.debug(f"rtt: {self.rtt_ra}, bitrate: {self.bitrate_ra}, healthy: {healthy}, locked: {scene_locked}, connected: {self.connected}.")
+                logging.debug(f"rtt: {self.rtt_ra}, bitrate: {self.bitrate_ra}, healthy: {healthy}, locked: {self.scene_locked}, connected: {self.connected}.")
                 logging.debug(f"rtt hist: {self.rtt_samples}, bitrate hist: {self.bitrate_samples}, update delta: {last_update_delta}.")
             else:
-                logging.debug(f"No stats. Healthy: {healthy}, locked: {scene_locked}, connected: {self.connected}.")
+                logging.debug(f"No stats. Healthy: {healthy}, locked: {self.scene_locked}, connected: {self.connected}.")
                 logging.debug(f"rtt hist: {self.rtt_samples}, bitrate hist: {self.bitrate_samples}, update delta: {last_update_delta}.")
 
-            if not scene_locked and not self.connected:
+            if not self.scene_locked and not self.connected:
             # if not self.obs_websoc.scene_locked and not self.connected:
                 healthy = False
 
             # If scene has been manually locked, don't switch scenes, even if we otherwise should.
-            if scene_locked:
+            if self.scene_locked:
                 pass
             elif healthy:
                 if stabilize_countdown >= 0.0:

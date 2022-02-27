@@ -14,5 +14,4 @@ certfile = f"{_ssl_path}/ssl.crt"
 keyfile = f"{_ssl_path}/ssl.key"
 
 # Server Hooks
-# when_ready = remote_control.when_ready
 on_exit = remote_control.on_exit
