@@ -6,8 +6,8 @@ Streaming from the field can be fraught with connectivity issues. So we use OBS 
 
 This part uses Gunicorn and Falcon for the API server, `srt-live-transmit` for the stats with the [obs-websocket](https://github.com/Palakis/obs-websocket) plugin and the [obs-websocket-py](https://github.com/Elektordi/) bindings. This has only been tested on Linux, but windows should probably work.
 
-- `srt-obs-switcher.py` can be used standalone as is.
-- However, there's also a gunicorn based REST API for control from the web page running from the Jetson Nano.
+- `srt-obs-switcher.py` can be used standalone as is. This is unsupported, and will likely be dropped altogether.
+- The preferred method it so use the gunicorn/falcon based REST API for control from the web page control panel running on the Jetson Nano.
 
 ## Dependencies
 
@@ -17,7 +17,7 @@ This part uses Gunicorn and Falcon for the API server, `srt-live-transmit` for t
 
 ## Setup & configuration
 
-Configuration is stored in `srt_config.toml`. Most of the options are documented there with comments, but most settings aren't going to need to be changed from the defaults.
+Configuration is stored in `srt_config.toml`. An example called `example-srt_config.toml` is included in the repo. Create a copy of this and rename it. Most of the options are documented there with comments, but most settings aren't going to need to be changed from the defaults.
 
 - Make sure to set a hard to guess api-key. If none is specified, a temporary one will be created each run and displayed in the console. This needs to **exactly** match the one on the sender sider.
 - API communication is over SSL. This means that SSL certificates need to be generated or obtained. Default location is the `ssl/` subdirectory. Cert generation isn't covered by this doc at this time.

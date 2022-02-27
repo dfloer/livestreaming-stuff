@@ -2,6 +2,8 @@
 listen_port = 4000  # port for the SRT relay to listen on
 output_port = 9000  # port for the SRT relaythat OBS connects to
 encryption_passphrase = ''  # SRT passphrase for encryption. If this is blank, one will be generated and printed in the console. This exact same key needs to be on the Nano as well.
+srt_latency = 2000  # Latency value in milliseconds. What is the maximum acceptable transmission latency, after which packets are dropped? This should be now lower than about 1000ms.
+loss_max_ttl = 50  # SRT packet reorder tolerance.
 
 srtla_internal_port = 0  # Optional internal port to use. By not setting this, port 4001 is used by default.
 srtla_rec_path = 'srtla_rec'  # Optional path to srtla_rec binary. If not set, it needs to be in your PATH.
@@ -17,13 +19,17 @@ scene_name = "IRL Input"  # name in OBS for the normal scene
 brb_scene_name = "BRB"  # name in obs of the brb scene
 
 [brb_thresholds]
-rtt = 150  # If the RTT goes _above_ this number, go brb
-bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb
+rtt = 150  # If the RTT goes _above_ this number, go brb. -1 to disable the check.
+bitrate = 1.0  # Mb/s. if the stream drops below this birate, go brb. -1 to disable the check.
 running_avg = 5  # To smooth over small blips, this many check_intervals are used to calculate a running average.
 check_interval = 0.1  # seconds. How often to check the stats
 stabilize_time = 2  # How many seconds do we have to be under the thresholds to go return from brb.
+cooldown_time = 5  # How many seconds to wait before going back to the BRB scene after we've been in it. This is to prevent jumping back and forth rapidly.
 
 [api]
 listen = "0.0.0.0:4443"  # ip address and port.
 ssl_path = "ssl/"  # path to SSL certificates to use. These can be self-signed or not. Must contain "ssl.key" and "ssl.crt" files.
 api_key = ""  # In order to authenticate the remote side, put a hard-to-guess API key here. If no key is specified on startup, one will br printed to the console. Make sure the key on the Jetson is the _exact_ same as here.
+
+[logging]
+log_level = ""  # What logging level to use. Possibilities are "debug", "info", "warning" and "error". Blank is info.
