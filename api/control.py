@@ -297,6 +297,10 @@ class StreamRemoteControl(object):
         logging.debug("StreamRemoteControl: unlocked")
         return self.get_res('/unlock')
 
+    def lock_stream(self):
+        logging.debug("StreamRemoteControl: locked")
+        return self.get_res('/lock')
+
     def get_res(self, endpoint):
         try:
             r = self.r_post(endpoint)

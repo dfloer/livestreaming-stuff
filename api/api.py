@@ -253,6 +253,9 @@ class StreamControls(object):
         elif "unlock" in req.url:
             self.stream_remote.unlock_stream()
             msg = "Stream unlocked."
+        elif "lock" in req.url:
+            self.stream_remote.lock_stream()
+            msg = "Stream locked."
 
         logging.debug(f"StreamControls: on_post result: {msg}")
 
